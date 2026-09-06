@@ -77,9 +77,9 @@ string standalone.quote_item_history(String quote_id)
 
 	quoteInfo = Map();
 	quoteInfo.put("id",quote_id);
-	quoteInfo.put("quote_number",quoteNumber);
-	quoteInfo.put("subject",ifnull(quote.get("Subject"),""));
-	quoteInfo.put("account_name",quoteAccount);
+	quoteInfo.put("quote_number",standalone.quote_item_history_clean(quoteNumber));
+	quoteInfo.put("subject",standalone.quote_item_history_clean(ifnull(quote.get("Subject"),"")));
+	quoteInfo.put("account_name",standalone.quote_item_history_clean(quoteAccount));
 	result.put("quote",quoteInfo);
 
 	/* ---- 2. the items on this quote drive the Item Name checklist -------- */
@@ -230,14 +230,14 @@ string standalone.quote_item_history(String quote_id)
 		header = ifnull(quoteHeaders.get(parentId),Map());
 
 		row = Map();
-		row.put("item_name",sku);
-		row.put("description",ifnull(line.get("Description"),""));
-		row.put("item_notes",ifnull(line.get("Item_Notes"),""));
+		row.put("item_name",standalone.quote_item_history_clean(sku));
+		row.put("description",standalone.quote_item_history_clean(ifnull(line.get("Description"),"")));
+		row.put("item_notes",standalone.quote_item_history_clean(ifnull(line.get("Item_Notes"),"")));
 		row.put("doc_type","Sales Quote");
-		row.put("doc_number",ifnull(header.get("quote_number"),parentName));
+		row.put("doc_number",standalone.quote_item_history_clean(ifnull(header.get("quote_number"),parentName)));
 		row.put("date",ifnull(header.get("date"),""));
-		row.put("account_name",ifnull(header.get("account_name"),""));
-		row.put("status",ifnull(header.get("status"),""));
+		row.put("account_name",standalone.quote_item_history_clean(ifnull(header.get("account_name"),"")));
+		row.put("status",standalone.quote_item_history_clean(ifnull(header.get("status"),"")));
 		row.put("quantity",ifnull(line.get("Quantity"),0));
 		row.put("item_price",ifnull(line.get("List_Price"),0));
 		row.put("discount",ifnull(line.get("Discount"),0));
@@ -352,14 +352,14 @@ string standalone.quote_item_history(String quote_id)
 							}
 
 							row = Map();
-							row.put("item_name",sku);
-							row.put("description",ifnull(booksLine.get("description"),ifnull(booksLine.get("name"),"")));
+							row.put("item_name",standalone.quote_item_history_clean(sku));
+							row.put("description",standalone.quote_item_history_clean(ifnull(booksLine.get("description"),ifnull(booksLine.get("name"),""))));
 							row.put("item_notes","");
 							row.put("doc_type",docType);
-							row.put("doc_number",ifnull(detail.get(numberKey),""));
+							row.put("doc_number",standalone.quote_item_history_clean(ifnull(detail.get(numberKey),"")));
 							row.put("date",ifnull(detail.get("date"),""));
-							row.put("account_name",ifnull(detail.get("customer_name"),""));
-							row.put("status",ifnull(detail.get("status"),""));
+							row.put("account_name",standalone.quote_item_history_clean(ifnull(detail.get("customer_name"),"")));
+							row.put("status",standalone.quote_item_history_clean(ifnull(detail.get("status"),"")));
 							row.put("quantity",quantity);
 							row.put("item_price",rate);
 							row.put("discount",discountAmount);
@@ -377,9 +377,15 @@ string standalone.quote_item_history(String quote_id)
 		}
 	}
 
+	cleanWarnings = List();
+	for each warning in warnings
+	{
+		cleanWarnings.add(standalone.quote_item_history_clean(warning));
+	}
+
 	result.put("success",true);
 	result.put("rows",rows);
-	result.put("warnings",warnings);
+	result.put("warnings",cleanWarnings);
 	return result.toString();
 }
 
@@ -453,4 +459,36 @@ map standalone.quote_item_history_headers(List quoteIds, Map headers, String crm
 	}
 
 	return merged;
+}
+
+/* ------------------------------------------------------------------------- *
+ * quote_item_history_clean
+ * ------------------------------------------------------------------------- *
+ * Helper: makes a free-text value safe to embed in the JSON string this
+ * function returns.
+ *
+ * The response is assembled with Map.toString(), which does NOT escape
+ * characters that are structural in JSON. Real ClearVista data trips this
+ * constantly - inch marks in product names and quote subjects (65" display,
+ * Sony 98" Panels) and hard line breaks in the multi-line Description field
+ * would each produce output the widget cannot parse. Rather than escaping,
+ * these characters are substituted with safe equivalents, which keeps the
+ * text readable in the table - a double quote becomes two apostrophes, which
+ * still reads correctly as an inch mark (65'' display).
+ * ------------------------------------------------------------------------- */
+
+string standalone.quote_item_history_clean(String value)
+{
+	if(value == null)
+	{
+		return "";
+	}
+	cleaned = value.toString();
+	/* Backslash first, so later substitutions cannot introduce one. */
+	cleaned = cleaned.replaceAll("\\\\","/");
+	cleaned = cleaned.replaceAll("\"","''");
+	cleaned = cleaned.replaceAll("\r"," ");
+	cleaned = cleaned.replaceAll("\n"," ");
+	cleaned = cleaned.replaceAll("\t"," ");
+	return cleaned.trim();
 }

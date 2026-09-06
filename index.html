@@ -1031,9 +1031,39 @@ function safeJsonParse(value){
   catch(error){ return value; }
 }
 
+// CRM answers a failed FUNCTIONS.execute with an error envelope rather than the
+// function's own output. Translate those codes into something actionable rather
+// than surfacing bare API text like "invalid data".
+var FUNCTION_ERROR_HELP = {
+  "INVALID_DATA":   'The "' + FUNCTION_NAME + '" function was not found in CRM. Create it as a standalone Deluge function from functions/' + FUNCTION_NAME + '.dg in the widget repository, then reopen this widget.',
+  "NOT_FOUND":      'The "' + FUNCTION_NAME + '" function was not found in CRM. Check that the function name matches exactly.',
+  "NO_PERMISSION":  'Your profile is not allowed to run the "' + FUNCTION_NAME + '" function. Ask an administrator to grant access.',
+  "INTERNAL_ERROR": 'The "' + FUNCTION_NAME + '" function failed while running. Check its execution log under Setup > Developer Hub > Functions.'
+};
+
 function executeFunction(name, args){
   return ZOHO.CRM.FUNCTIONS.execute(name, { arguments: JSON.stringify(args) })
-    .then(function(response){ return safeJsonParse(parseFunctionResult(response)); });
+    .then(function(response){
+      var code = response && response.code ? String(response.code).toUpperCase() : "";
+      var status = response && response.status ? String(response.status).toLowerCase() : "";
+
+      if(status === "error" || (code !== "" && code !== "SUCCESS")){
+        console.error("FUNCTIONS.execute failed:", response);
+        throw new Error(FUNCTION_ERROR_HELP[code] ||
+          'The "' + name + '" function call failed' + (code ? " (" + code + ")" : "") + ".");
+      }
+
+      var parsed = safeJsonParse(parseFunctionResult(response));
+
+      // A string here means the output was not valid JSON - most often
+      // unescaped quotes or newlines in a description or subject.
+      if(typeof parsed === "string"){
+        console.error("Unparseable function output:", parsed);
+        throw new Error('The "' + name + '" function returned output that is not valid JSON. Check its execution log under Setup > Developer Hub > Functions.');
+      }
+
+      return parsed;
+    });
 }
 
 function normalizeRows(rows){

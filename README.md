@@ -82,10 +82,13 @@ https://go-clear-vista.github.io/clearvista-crm-widget-quote-item-history/
 
 ### 2. Deploy the backend function
 
+**This step is required - the widget cannot load anything without it.** If the
+function is missing, the widget reports that the function was not found.
+
 Create a **standalone Deluge function** named `quote_item_history` (Setup →
 Developer Hub → Functions) and paste in `functions/quote_item_history.dg`. It
-contains two functions - `quote_item_history` and the helper
-`quote_item_history_headers` - create both.
+contains three functions - `quote_item_history`, plus the helpers
+`quote_item_history_headers` and `quote_item_history_clean` - create all three.
 
 Then set the two configuration constants at the top of `quote_item_history`:
 
@@ -133,6 +136,8 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 
 | Symptom | Cause / fix |
 | --- | --- |
+| "The quote_item_history function was not found in CRM" | The Deluge function has not been created yet - see step 2. This is what CRM's raw `INVALID_DATA` response means. |
+| "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
 | Banner: "Sales quote history could not be loaded" | `CRM_CONNECTION` is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
 | Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is still blank in the function |
 | Table shows quotes but no orders/invoices | The CRM SKU has no matching Books item, or the Books item has no documents in the selected timeframe |
@@ -151,6 +156,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.0
+- **Version**: 1.0.1
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books
