@@ -1,41 +1,40 @@
-/* ------------------------------------------------------------------------- *
- * quote_item_history
- * ------------------------------------------------------------------------- *
- * Backend for the "Item History" widget (ClearVista-CRM-widget-quote-item-history).
- *
- * Called from the widget as:
- *     ZOHO.CRM.FUNCTIONS.execute("quote_item_history", {
- *         arguments: JSON.stringify({ quote_id: "<record id>" })
- *     });
- *
- * Returns a JSON string:
- * {
- *   "success": true,
- *   "quote":   { "id": "...", "quote_number": "SQ-100984", "subject": "...", "account_name": "..." },
- *   "items":   ["AMP-X50MP", "DM-RMC-4KZ-SCALER-C"],
- *   "rows":    [ { item_name, description, item_notes, doc_type, doc_number, date,
- *                  account_name, status, item_price, discount, line_total,
- *                  quantity, total_after_discount } ],
- *   "warnings":["..."]
- * }
- *
- * Money convention (see CLAUDE.md): item_price is the per-unit list price and
- * total_after_discount is the DISCOUNTED EXTENDED total. The widget derives the
- * true per-unit price as total_after_discount / quantity, because Item Price is
- * sometimes a pre-discount list price.
- *
- * ---- Setup required before this function will return Books data -----------
- * 1. CRM_CONNECTION - a Zoho CRM connection (Setup > Developer Hub >
- *    Connections) with scope ZohoCRM.coql.READ. Used to query the Quoted_Items
- *    subform module across all quotes via COQL.
- * 2. BOOKS_ORG_ID - the Zoho Books organization ID. Leave blank to run the
- *    widget against CRM sales quotes only; a warning is surfaced in the UI.
- * Both failures are non-fatal: the widget still renders whatever it could load.
- * ------------------------------------------------------------------------- */
-
 string standalone.quote_item_history(String quote_id)
 {
-	/* ---- configuration -------------------------------------------------- */
+	/* ---------------------------------------------------------------------
+	 * Backend for the "Item History" widget.
+	 *
+	 * Zoho's function editor accepts exactly ONE function per definition and
+	 * requires the signature to be the first line, so everything lives in this
+	 * one function - there are no helpers to create separately.
+	 *
+	 * Create it as:
+	 *   Return type : String
+	 *   Argument    : quote_id (String)
+	 * The widget calls it with:
+	 *   ZOHO.CRM.FUNCTIONS.execute("quote_item_history",
+	 *       { arguments: JSON.stringify({ quote_id: "<record id>" }) });
+	 *
+	 * Returns JSON:
+	 * { "success": true,
+	 *   "quote":   { id, quote_number, subject, account_name },
+	 *   "items":   ["SKU", ...],
+	 *   "rows":    [ { item_name, description, item_notes, doc_type, doc_number,
+	 *                  date, account_name, status, item_price, discount,
+	 *                  line_total, quantity, total_after_discount } ],
+	 *   "warnings":["..."] }
+	 *
+	 * Money convention (see CLAUDE.md): item_price is the per-unit list price
+	 * and total_after_discount is the DISCOUNTED EXTENDED total. The widget
+	 * derives the true per-unit price as total_after_discount / quantity,
+	 * because the stored item price is sometimes a pre-discount list price.
+	 *
+	 * Setup:
+	 *   CRM_CONNECTION - a connection with scope ZohoCRM.coql.READ, used to
+	 *                    query the Quoted_Items subform module across quotes.
+	 *   BOOKS_ORG_ID   - Zoho Books organization ID. Leave blank to run against
+	 *                    CRM sales quotes only; the widget says so in a banner.
+	 * Both failures are non-fatal - the widget renders whatever it could load.
+	 * --------------------------------------------------------------------- */
 	CRM_CONNECTION = "zoho_crm_conn";
 	BOOKS_ORG_ID = "";
 	MAX_DOCS_PER_TYPE = 60;
@@ -46,7 +45,6 @@ string standalone.quote_item_history(String quote_id)
 	items = List();
 	warnings = List();
 
-	/* ---- validate input ------------------------------------------------- */
 	if(quote_id == null || quote_id.trim() == "")
 	{
 		result.put("success",false);
@@ -64,30 +62,22 @@ string standalone.quote_item_history(String quote_id)
 		return result.toString();
 	}
 
-	quoteNumber = ifnull(quote.get("CRM_Quote_Number"),"");
+	quoteNumber = ifnull(quote.get("CRM_Quote_Number"),"").toString();
 	if(quoteNumber == "")
 	{
-		quoteNumber = ifnull(quote.get("Quote_Number"),quote_id);
+		quoteNumber = ifnull(quote.get("Quote_Number"),quote_id).toString();
 	}
 	quoteAccount = "";
 	if(quote.get("Account_Name") != null)
 	{
-		quoteAccount = ifnull(quote.get("Account_Name").get("name"),"");
+		quoteAccount = ifnull(quote.get("Account_Name").get("name"),"").toString();
 	}
-
-	quoteInfo = Map();
-	quoteInfo.put("id",quote_id);
-	quoteInfo.put("quote_number",standalone.quote_item_history_clean(quoteNumber));
-	quoteInfo.put("subject",standalone.quote_item_history_clean(ifnull(quote.get("Subject"),"")));
-	quoteInfo.put("account_name",standalone.quote_item_history_clean(quoteAccount));
-	result.put("quote",quoteInfo);
 
 	/* ---- 2. the items on this quote drive the Item Name checklist -------- */
 	productIds = List();
 	skuById = Map();
 
-	quotedItems = ifnull(quote.get("Quoted_Items"),List());
-	for each lineItem in quotedItems
+	for each lineItem in ifnull(quote.get("Quoted_Items"),List())
 	{
 		product = lineItem.get("Product_Name");
 		if(product == null)
@@ -110,385 +100,387 @@ string standalone.quote_item_history(String quote_id)
 			items.add(sku);
 		}
 	}
-	result.put("items",items);
 
-	if(productIds.size() == 0)
+	if(productIds.size() > 0)
 	{
-		result.put("success",true);
-		result.put("rows",rows);
-		warnings.add("This quote has no line items with a linked product, so there is nothing to build a history from.");
-		result.put("warnings",warnings);
-		return result.toString();
-	}
-
-	/* ---- 3. CRM sales quote history (COQL over Quoted_Items) ------------ */
-	idClause = "";
-	for each productId in productIds
-	{
-		if(idClause != "")
+		idClause = "";
+		for each productId in productIds
 		{
-			idClause = idClause + ",";
-		}
-		idClause = idClause + "'" + productId + "'";
-	}
-
-	quoteLines = List();
-	parentIds = List();
-	crmLoaded = false;
-
-	try
-	{
-		offset = 0;
-		morePages = true;
-		pageCount = 0;
-		while(morePages && pageCount < MAX_HISTORY_PAGES)
-		{
-			coql = "select Parent_Id, Product_Name, Description, Item_Notes, Quantity, List_Price, Discount, Total, Total_After_Discount from Quoted_Items where Product_Name in (" + idClause + ") limit " + offset + ", 200";
-			body = Map();
-			body.put("select_query",coql);
-			response = invokeurl
-			[
-				url :"https://www.zohoapis.com/crm/v7/coql"
-				type :POST
-				parameters:body.toString()
-				connection:CRM_CONNECTION
-			];
-			pageData = ifnull(response.get("data"),List());
-			for each line in pageData
+			if(idClause != "")
 			{
-				quoteLines.add(line);
-				parent = line.get("Parent_Id");
-				if(parent != null)
-				{
-					parentId = ifnull(parent.get("id"),"").toString();
-					if(parentId != "" && !parentIds.contains(parentId))
-					{
-						parentIds.add(parentId);
-					}
-				}
+				idClause = idClause + ",";
 			}
-			morePages = false;
-			info = response.get("info");
-			if(info != null && ifnull(info.get("more_records"),false) == true)
-			{
-				morePages = true;
-				offset = offset + 200;
-			}
-			pageCount = pageCount + 1;
+			idClause = idClause + "'" + productId + "'";
 		}
-		crmLoaded = true;
-	}
-	catch (e)
-	{
-		warnings.add("Sales quote history could not be loaded (COQL connection '" + CRM_CONNECTION + "'): " + e.toString());
-	}
 
-	/* ---- 3b. parent quote headers for account / stage / date ------------- */
-	quoteHeaders = Map();
-	if(crmLoaded && parentIds.size() > 0)
-	{
+		/* ---- 3. CRM sales quote history (COQL over Quoted_Items) -------- */
+		quoteLines = List();
+		parentIds = List();
+		crmLoaded = false;
+
 		try
 		{
-			batch = List();
-			for each parentId in parentIds
+			offset = 0;
+			morePages = true;
+			pageCount = 0;
+			while(morePages && pageCount < MAX_HISTORY_PAGES)
 			{
-				batch.add(parentId);
-				if(batch.size() == 100)
+				coql = "select Parent_Id, Product_Name, Description, Item_Notes, Quantity, List_Price, Discount, Total, Total_After_Discount from Quoted_Items where Product_Name in (" + idClause + ") limit " + offset + ", 200";
+				body = Map();
+				body.put("select_query",coql);
+				response = invokeurl
+				[
+					url :"https://www.zohoapis.com/crm/v7/coql"
+					type :POST
+					parameters:body.toString()
+					connection:CRM_CONNECTION
+				];
+				for each line in ifnull(response.get("data"),List())
 				{
-					quoteHeaders = standalone.quote_item_history_headers(batch,quoteHeaders,CRM_CONNECTION);
-					batch = List();
+					quoteLines.add(line);
+					parent = line.get("Parent_Id");
+					if(parent != null)
+					{
+						parentId = ifnull(parent.get("id"),"").toString();
+						if(parentId != "" && !parentIds.contains(parentId))
+						{
+							parentIds.add(parentId);
+						}
+					}
 				}
+				morePages = false;
+				info = response.get("info");
+				if(info != null && ifnull(info.get("more_records"),false) == true)
+				{
+					morePages = true;
+					offset = offset + 200;
+				}
+				pageCount = pageCount + 1;
 			}
-			if(batch.size() > 0)
-			{
-				quoteHeaders = standalone.quote_item_history_headers(batch,quoteHeaders,CRM_CONNECTION);
-			}
+			crmLoaded = true;
 		}
 		catch (e)
 		{
-			warnings.add("Quote header details could not be loaded: " + e.toString());
-		}
-	}
-
-	for each line in quoteLines
-	{
-		product = line.get("Product_Name");
-		if(product == null)
-		{
-			continue;
-		}
-		sku = ifnull(product.get("name"),"").toString();
-		parent = line.get("Parent_Id");
-		parentId = "";
-		parentName = "";
-		if(parent != null)
-		{
-			parentId = ifnull(parent.get("id"),"").toString();
-			parentName = ifnull(parent.get("name"),"").toString();
+			warnings.add("Sales quote history could not be loaded (COQL connection '" + CRM_CONNECTION + "'): " + e.toString());
 		}
 
-		header = ifnull(quoteHeaders.get(parentId),Map());
-
-		row = Map();
-		row.put("item_name",standalone.quote_item_history_clean(sku));
-		row.put("description",standalone.quote_item_history_clean(ifnull(line.get("Description"),"")));
-		row.put("item_notes",standalone.quote_item_history_clean(ifnull(line.get("Item_Notes"),"")));
-		row.put("doc_type","Sales Quote");
-		row.put("doc_number",standalone.quote_item_history_clean(ifnull(header.get("quote_number"),parentName)));
-		row.put("date",ifnull(header.get("date"),""));
-		row.put("account_name",standalone.quote_item_history_clean(ifnull(header.get("account_name"),"")));
-		row.put("status",standalone.quote_item_history_clean(ifnull(header.get("status"),"")));
-		row.put("quantity",ifnull(line.get("Quantity"),0));
-		row.put("item_price",ifnull(line.get("List_Price"),0));
-		row.put("discount",ifnull(line.get("Discount"),0));
-		row.put("line_total",ifnull(line.get("Total"),0));
-		row.put("total_after_discount",ifnull(line.get("Total_After_Discount"),0));
-		rows.add(row);
-	}
-
-	/* ---- 4. Zoho Books sales orders and invoices ------------------------ */
-	if(BOOKS_ORG_ID == "")
-	{
-		warnings.add("Zoho Books sales orders and invoices are not included: set BOOKS_ORG_ID in the quote_item_history function.");
-	}
-	else
-	{
-		booksModules = List();
-		booksModules.add("SalesOrders");
-		booksModules.add("Invoices");
-
-		for each booksModule in booksModules
+		/* ---- 3b. parent quote headers, in batches of 100 ---------------- */
+		quoteHeaders = Map();
+		if(crmLoaded && parentIds.size() > 0)
 		{
-			docType = "Sales Order";
-			numberKey = "salesorder_number";
-			idKey = "salesorder_id";
-			if(booksModule == "Invoices")
+			try
 			{
-				docType = "Sales Invoice";
-				numberKey = "invoice_number";
-				idKey = "invoice_id";
-			}
-
-			for each productId in productIds
-			{
-				sku = ifnull(skuById.get(productId),"").toString();
-				if(sku == "")
+				seen = 0;
+				total = parentIds.size();
+				batch = List();
+				for each parentId in parentIds
 				{
-					continue;
-				}
-				try
-				{
-					/* Books item lookup by SKU - CRM Product_Name == Product_Code == SKU */
-					itemCriteria = Map();
-					itemCriteria.put("name",sku);
-					itemResp = zoho.books.getRecords("Items",BOOKS_ORG_ID,itemCriteria);
-					booksItems = ifnull(itemResp.get("items"),List());
-					booksItemId = "";
-					for each booksItem in booksItems
+					batch.add(parentId);
+					seen = seen + 1;
+					if(batch.size() == 100 || seen == total)
 					{
-						candidate = ifnull(booksItem.get("sku"),"").toString();
-						if(candidate == "")
+						batchClause = "";
+						for each batchId in batch
 						{
-							candidate = ifnull(booksItem.get("name"),"").toString();
+							if(batchClause != "")
+							{
+								batchClause = batchClause + ",";
+							}
+							batchClause = batchClause + "'" + batchId + "'";
 						}
-						if(candidate.equalsIgnoreCase(sku))
+						headerCoql = "select id, CRM_Quote_Number, Quote_Stage, Account_Name, Date_created_on_document, Created_Time from Quotes where id in (" + batchClause + ") limit 0, 200";
+						headerBody = Map();
+						headerBody.put("select_query",headerCoql);
+						headerResp = invokeurl
+						[
+							url :"https://www.zohoapis.com/crm/v7/coql"
+							type :POST
+							parameters:headerBody.toString()
+							connection:CRM_CONNECTION
+						];
+						for each record in ifnull(headerResp.get("data"),List())
 						{
-							booksItemId = ifnull(booksItem.get("item_id"),"").toString();
-							break;
-						}
-					}
-					if(booksItemId == "")
-					{
-						continue;
-					}
-
-					/* Documents that contain this item - the item_id filter keeps
-					   the follow-up detail calls bounded to relevant documents. */
-					docCriteria = Map();
-					docCriteria.put("item_id",booksItemId);
-					docCriteria.put("per_page",200);
-					docResp = zoho.books.getRecords(booksModule,BOOKS_ORG_ID,docCriteria);
-					docList = ifnull(docResp.get(booksModule.toLowerCase()),List());
-
-					fetched = 0;
-					for each doc in docList
-					{
-						if(fetched >= MAX_DOCS_PER_TYPE)
-						{
-							warnings.add("Only the " + MAX_DOCS_PER_TYPE + " most recent " + docType.toLowerCase() + "s were read for " + sku + ".");
-							break;
-						}
-						docId = ifnull(doc.get(idKey),"").toString();
-						if(docId == "")
-						{
-							continue;
-						}
-						detailResp = zoho.books.getRecordsByID(booksModule,BOOKS_ORG_ID,docId);
-						detail = detailResp;
-						if(detailResp.get("salesorder") != null)
-						{
-							detail = detailResp.get("salesorder");
-						}
-						else if(detailResp.get("invoice") != null)
-						{
-							detail = detailResp.get("invoice");
-						}
-						fetched = fetched + 1;
-
-						for each booksLine in ifnull(detail.get("line_items"),List())
-						{
-							if(ifnull(booksLine.get("item_id"),"").toString() != booksItemId)
+							recordId = ifnull(record.get("id"),"").toString();
+							if(recordId == "")
 							{
 								continue;
 							}
-							quantity = ifnull(booksLine.get("quantity"),0).toDecimal();
-							rate = ifnull(booksLine.get("rate"),0).toDecimal();
-							itemTotal = ifnull(booksLine.get("item_total"),0).toDecimal();
-							gross = rate * quantity;
-							discountAmount = gross - itemTotal;
-							if(discountAmount < 0)
+							documentDate = ifnull(record.get("Date_created_on_document"),"").toString();
+							if(documentDate == "")
 							{
-								discountAmount = 0;
+								/* Created_Time is an ISO timestamp - keep the date only. */
+								documentDate = ifnull(record.get("Created_Time"),"").toString();
+								if(documentDate.length() >= 10)
+								{
+									documentDate = documentDate.subString(0,10);
+								}
 							}
-
-							row = Map();
-							row.put("item_name",standalone.quote_item_history_clean(sku));
-							row.put("description",standalone.quote_item_history_clean(ifnull(booksLine.get("description"),ifnull(booksLine.get("name"),""))));
-							row.put("item_notes","");
-							row.put("doc_type",docType);
-							row.put("doc_number",standalone.quote_item_history_clean(ifnull(detail.get(numberKey),"")));
-							row.put("date",ifnull(detail.get("date"),""));
-							row.put("account_name",standalone.quote_item_history_clean(ifnull(detail.get("customer_name"),"")));
-							row.put("status",standalone.quote_item_history_clean(ifnull(detail.get("status"),"")));
-							row.put("quantity",quantity);
-							row.put("item_price",rate);
-							row.put("discount",discountAmount);
-							row.put("line_total",gross);
-							row.put("total_after_discount",itemTotal);
-							rows.add(row);
+							headerAccount = "";
+							if(record.get("Account_Name") != null)
+							{
+								headerAccount = ifnull(record.get("Account_Name").get("name"),"").toString();
+							}
+							header = Map();
+							header.put("quote_number",ifnull(record.get("CRM_Quote_Number"),"").toString());
+							header.put("status",ifnull(record.get("Quote_Stage"),"").toString());
+							header.put("account_name",headerAccount);
+							header.put("date",documentDate);
+							quoteHeaders.put(recordId,header);
 						}
+						batch = List();
 					}
 				}
-				catch (e)
+			}
+			catch (e)
+			{
+				warnings.add("Quote header details could not be loaded: " + e.toString());
+			}
+		}
+
+		for each line in quoteLines
+		{
+			product = line.get("Product_Name");
+			if(product == null)
+			{
+				continue;
+			}
+			lineSku = ifnull(product.get("name"),"").toString();
+			parent = line.get("Parent_Id");
+			parentId = "";
+			parentName = "";
+			if(parent != null)
+			{
+				parentId = ifnull(parent.get("id"),"").toString();
+				parentName = ifnull(parent.get("name"),"").toString();
+			}
+			header = ifnull(quoteHeaders.get(parentId),Map());
+
+			row = Map();
+			row.put("item_name",lineSku);
+			row.put("description",ifnull(line.get("Description"),""));
+			row.put("item_notes",ifnull(line.get("Item_Notes"),""));
+			row.put("doc_type","Sales Quote");
+			row.put("doc_number",ifnull(header.get("quote_number"),parentName));
+			row.put("date",ifnull(header.get("date"),""));
+			row.put("account_name",ifnull(header.get("account_name"),""));
+			row.put("status",ifnull(header.get("status"),""));
+			row.put("quantity",ifnull(line.get("Quantity"),0));
+			row.put("item_price",ifnull(line.get("List_Price"),0));
+			row.put("discount",ifnull(line.get("Discount"),0));
+			row.put("line_total",ifnull(line.get("Total"),0));
+			row.put("total_after_discount",ifnull(line.get("Total_After_Discount"),0));
+			rows.add(row);
+		}
+
+		/* ---- 4. Zoho Books sales orders and invoices -------------------- */
+		if(BOOKS_ORG_ID == "")
+		{
+			warnings.add("Zoho Books sales orders and invoices are not included: set BOOKS_ORG_ID in the quote_item_history function.");
+		}
+		else
+		{
+			booksModules = List();
+			booksModules.add("SalesOrders");
+			booksModules.add("Invoices");
+
+			for each booksModule in booksModules
+			{
+				docType = "Sales Order";
+				numberKey = "salesorder_number";
+				idKey = "salesorder_id";
+				if(booksModule == "Invoices")
 				{
-					warnings.add(docType + " history for " + sku + " could not be loaded: " + e.toString());
+					docType = "Sales Invoice";
+					numberKey = "invoice_number";
+					idKey = "invoice_id";
+				}
+
+				for each productId in productIds
+				{
+					booksSku = ifnull(skuById.get(productId),"").toString();
+					if(booksSku == "")
+					{
+						continue;
+					}
+					try
+					{
+						/* Books item lookup by SKU - CRM Product_Name == Product_Code == SKU */
+						itemCriteria = Map();
+						itemCriteria.put("name",booksSku);
+						itemResp = zoho.books.getRecords("Items",BOOKS_ORG_ID,itemCriteria);
+						booksItemId = "";
+						for each booksItem in ifnull(itemResp.get("items"),List())
+						{
+							candidate = ifnull(booksItem.get("sku"),"").toString();
+							if(candidate == "")
+							{
+								candidate = ifnull(booksItem.get("name"),"").toString();
+							}
+							if(candidate.equalsIgnoreCase(booksSku))
+							{
+								booksItemId = ifnull(booksItem.get("item_id"),"").toString();
+								break;
+							}
+						}
+						if(booksItemId == "")
+						{
+							continue;
+						}
+
+						/* The item_id filter keeps the follow-up detail calls
+						   bounded to documents that actually contain the item. */
+						docCriteria = Map();
+						docCriteria.put("item_id",booksItemId);
+						docCriteria.put("per_page",200);
+						docResp = zoho.books.getRecords(booksModule,BOOKS_ORG_ID,docCriteria);
+						docList = ifnull(docResp.get(booksModule.toLowerCase()),List());
+
+						fetched = 0;
+						for each doc in docList
+						{
+							if(fetched >= MAX_DOCS_PER_TYPE)
+							{
+								warnings.add("Only the " + MAX_DOCS_PER_TYPE + " most recent " + docType.toLowerCase() + "s were read for " + booksSku + ".");
+								break;
+							}
+							docId = ifnull(doc.get(idKey),"").toString();
+							if(docId == "")
+							{
+								continue;
+							}
+							detailResp = zoho.books.getRecordsByID(booksModule,BOOKS_ORG_ID,docId);
+							detail = detailResp;
+							if(detailResp.get("salesorder") != null)
+							{
+								detail = detailResp.get("salesorder");
+							}
+							else if(detailResp.get("invoice") != null)
+							{
+								detail = detailResp.get("invoice");
+							}
+							fetched = fetched + 1;
+
+							for each booksLine in ifnull(detail.get("line_items"),List())
+							{
+								if(ifnull(booksLine.get("item_id"),"").toString() != booksItemId)
+								{
+									continue;
+								}
+								quantity = ifnull(booksLine.get("quantity"),0).toDecimal();
+								rate = ifnull(booksLine.get("rate"),0).toDecimal();
+								itemTotal = ifnull(booksLine.get("item_total"),0).toDecimal();
+								gross = rate * quantity;
+								discountAmount = gross - itemTotal;
+								if(discountAmount < 0)
+								{
+									discountAmount = 0;
+								}
+
+								bookRow = Map();
+								bookRow.put("item_name",booksSku);
+								bookRow.put("description",ifnull(booksLine.get("description"),ifnull(booksLine.get("name"),"")));
+								bookRow.put("item_notes","");
+								bookRow.put("doc_type",docType);
+								bookRow.put("doc_number",ifnull(detail.get(numberKey),""));
+								bookRow.put("date",ifnull(detail.get("date"),""));
+								bookRow.put("account_name",ifnull(detail.get("customer_name"),""));
+								bookRow.put("status",ifnull(detail.get("status"),""));
+								bookRow.put("quantity",quantity);
+								bookRow.put("item_price",rate);
+								bookRow.put("discount",discountAmount);
+								bookRow.put("line_total",gross);
+								bookRow.put("total_after_discount",itemTotal);
+								rows.add(bookRow);
+							}
+						}
+					}
+					catch (e)
+					{
+						warnings.add(docType + " history for " + booksSku + " could not be loaded: " + e.toString());
+					}
 				}
 			}
 		}
+	}
+	else
+	{
+		warnings.add("This quote has no line items with a linked product, so there is nothing to build a history from.");
+	}
+
+	/* ---- 5. make every free-text value safe to embed in JSON ------------ *
+	 * The response is assembled with Map.toString(), which does NOT escape
+	 * characters that are structural in JSON. Real ClearVista data trips this
+	 * constantly - inch marks in product names and quote subjects (65"
+	 * display, Sony 98" Panels) and hard line breaks in the multi-line
+	 * Description field would each produce output the widget cannot parse.
+	 * Rather than escaping, these characters are substituted with safe
+	 * equivalents, which keeps the text readable in the table: a double quote
+	 * becomes two apostrophes, which still reads as an inch mark (65'').
+	 * -------------------------------------------------------------------- */
+	textKeys = List();
+	textKeys.add("item_name");
+	textKeys.add("description");
+	textKeys.add("item_notes");
+	textKeys.add("doc_number");
+	textKeys.add("account_name");
+	textKeys.add("status");
+
+	cleanRows = List();
+	for each row in rows
+	{
+		for each textKey in textKeys
+		{
+			raw = ifnull(row.get(textKey),"").toString();
+			raw = raw.replaceAll("\\\\","/");
+			raw = raw.replaceAll("\"","''");
+			raw = raw.replaceAll("\r"," ");
+			raw = raw.replaceAll("\n"," ");
+			raw = raw.replaceAll("\t"," ");
+			row.put(textKey,raw.trim());
+		}
+		cleanRows.add(row);
+	}
+
+	cleanItems = List();
+	for each item in items
+	{
+		cleanItem = item.toString();
+		cleanItem = cleanItem.replaceAll("\\\\","/");
+		cleanItem = cleanItem.replaceAll("\"","''");
+		cleanItems.add(cleanItem.trim());
 	}
 
 	cleanWarnings = List();
 	for each warning in warnings
 	{
-		cleanWarnings.add(standalone.quote_item_history_clean(warning));
+		cleanWarning = warning.toString();
+		cleanWarning = cleanWarning.replaceAll("\\\\","/");
+		cleanWarning = cleanWarning.replaceAll("\"","''");
+		cleanWarning = cleanWarning.replaceAll("\r"," ");
+		cleanWarning = cleanWarning.replaceAll("\n"," ");
+		cleanWarning = cleanWarning.replaceAll("\t"," ");
+		cleanWarnings.add(cleanWarning.trim());
 	}
+
+	quoteSubject = ifnull(quote.get("Subject"),"").toString();
+	quoteSubject = quoteSubject.replaceAll("\\\\","/");
+	quoteSubject = quoteSubject.replaceAll("\"","''");
+	quoteSubject = quoteSubject.replaceAll("\r"," ");
+	quoteSubject = quoteSubject.replaceAll("\n"," ");
+	quoteSubject = quoteSubject.replaceAll("\t"," ");
+	quoteAccount = quoteAccount.replaceAll("\"","''");
+	quoteNumber = quoteNumber.replaceAll("\"","''");
+
+	quoteInfo = Map();
+	quoteInfo.put("id",quote_id);
+	quoteInfo.put("quote_number",quoteNumber.trim());
+	quoteInfo.put("subject",quoteSubject.trim());
+	quoteInfo.put("account_name",quoteAccount.trim());
 
 	result.put("success",true);
-	result.put("rows",rows);
+	result.put("quote",quoteInfo);
+	result.put("items",cleanItems);
+	result.put("rows",cleanRows);
 	result.put("warnings",cleanWarnings);
 	return result.toString();
-}
-
-/* ------------------------------------------------------------------------- *
- * quote_item_history_headers
- * ------------------------------------------------------------------------- *
- * Helper: resolves quote headers (number, account, stage, document date) for a
- * batch of quote record IDs and merges them into the supplied map, keyed by ID.
- * ------------------------------------------------------------------------- */
-
-map standalone.quote_item_history_headers(List quoteIds, Map headers, String crmConnection)
-{
-	merged = ifnull(headers,Map());
-	if(quoteIds == null || quoteIds.size() == 0)
-	{
-		return merged;
-	}
-
-	idClause = "";
-	for each quoteId in quoteIds
-	{
-		if(idClause != "")
-		{
-			idClause = idClause + ",";
-		}
-		idClause = idClause + "'" + quoteId + "'";
-	}
-
-	coql = "select id, CRM_Quote_Number, Quote_Stage, Account_Name, Date_created_on_document, Created_Time from Quotes where id in (" + idClause + ") limit 0, 200";
-	body = Map();
-	body.put("select_query",coql);
-	response = invokeurl
-	[
-		url :"https://www.zohoapis.com/crm/v7/coql"
-		type :POST
-		parameters:body.toString()
-		connection:crmConnection
-	];
-
-	for each record in ifnull(response.get("data"),List())
-	{
-		recordId = ifnull(record.get("id"),"").toString();
-		if(recordId == "")
-		{
-			continue;
-		}
-
-		documentDate = ifnull(record.get("Date_created_on_document"),"").toString();
-		if(documentDate == "")
-		{
-			/* Created_Time is an ISO timestamp - keep the date portion only. */
-			documentDate = ifnull(record.get("Created_Time"),"").toString();
-			if(documentDate.length() >= 10)
-			{
-				documentDate = documentDate.subString(0,10);
-			}
-		}
-
-		accountName = "";
-		if(record.get("Account_Name") != null)
-		{
-			accountName = ifnull(record.get("Account_Name").get("name"),"");
-		}
-
-		header = Map();
-		header.put("quote_number",ifnull(record.get("CRM_Quote_Number"),""));
-		header.put("status",ifnull(record.get("Quote_Stage"),""));
-		header.put("account_name",accountName);
-		header.put("date",documentDate);
-		merged.put(recordId,header);
-	}
-
-	return merged;
-}
-
-/* ------------------------------------------------------------------------- *
- * quote_item_history_clean
- * ------------------------------------------------------------------------- *
- * Helper: makes a free-text value safe to embed in the JSON string this
- * function returns.
- *
- * The response is assembled with Map.toString(), which does NOT escape
- * characters that are structural in JSON. Real ClearVista data trips this
- * constantly - inch marks in product names and quote subjects (65" display,
- * Sony 98" Panels) and hard line breaks in the multi-line Description field
- * would each produce output the widget cannot parse. Rather than escaping,
- * these characters are substituted with safe equivalents, which keeps the
- * text readable in the table - a double quote becomes two apostrophes, which
- * still reads correctly as an inch mark (65'' display).
- * ------------------------------------------------------------------------- */
-
-string standalone.quote_item_history_clean(String value)
-{
-	if(value == null)
-	{
-		return "";
-	}
-	cleaned = value.toString();
-	/* Backslash first, so later substitutions cannot introduce one. */
-	cleaned = cleaned.replaceAll("\\\\","/");
-	cleaned = cleaned.replaceAll("\"","''");
-	cleaned = cleaned.replaceAll("\r"," ");
-	cleaned = cleaned.replaceAll("\n"," ");
-	cleaned = cleaned.replaceAll("\t"," ");
-	return cleaned.trim();
 }

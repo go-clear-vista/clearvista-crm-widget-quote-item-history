@@ -2,6 +2,22 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.2] - 2026-09-07
+
+### Fixed
+- The backend would not save in Zoho's function editor, which rejected it with
+  "Improper code format". The editor accepts exactly one function per
+  definition and requires the signature to be its first line, but the file
+  shipped three functions behind a leading block comment. `quote_item_history`
+  is now a single self-contained function with its signature on line 1: the
+  quote-header lookup is inlined as a batched loop, and the JSON sanitising is
+  a single pass over the assembled rows rather than a helper called per field.
+
+### Changed
+- Setup instructions now spell out the editor configuration that the signature
+  is validated against - Return Type **String** (not the default `void`) and a
+  `quote_id` String argument - and cover the "Improper code format" error.
+
 ## [1.0.1] - 2026-09-06
 
 ### Fixed
