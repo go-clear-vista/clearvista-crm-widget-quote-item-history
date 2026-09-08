@@ -285,6 +285,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.3.1
+- **Version**: 1.3.2
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

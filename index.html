@@ -444,6 +444,10 @@
       border-color:#fecaca;
       border-style:solid;
       background:#fef2f2;
+      align-items:flex-start;
+      user-select:text;
+      word-break:break-word;
+      line-height:1.5;
     }
 
     .warn{
@@ -1317,8 +1321,8 @@ async function onPageLoad(data){
     if(!recordId){
       var seen = "";
       try { seen = JSON.stringify(data); } catch(ignored){ seen = String(data); }
-      if(seen && seen.length > 400) seen = seen.slice(0,400) + "...";
-      throw new Error("This quote could not be identified. The Client Script must pass data.quote_id or data.quote_number in its openPopup call - see client-script/see_historical_prices.js. CRM sent: " + seen);
+      if(seen && seen.length > 900) seen = seen.slice(0,900) + "...";
+      throw new Error("This quote could not be identified. Send this whole message on so the payload can be read. PageLoad delivered: " + seen);
     }
 
     var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });

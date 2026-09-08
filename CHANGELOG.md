@@ -2,6 +2,17 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.3.2] - 2026-09-08
+
+### Changed
+- The Client Script no longer refuses to open the popup when it cannot read an
+  identifier from the page. That check hid the useful information: the widget
+  accepts `EntityId` from `PageLoad` too, and when it can identify nothing it
+  echoes the payload it received - the only way to see what a popup-launched
+  widget is actually given. The popup now always opens and the widget reports.
+- The on-screen diagnostic carries up to 900 characters of payload and wraps
+  and selects properly, so it can be copied out without console access.
+
 ## [1.3.1] - 2026-09-08
 
 ### Fixed

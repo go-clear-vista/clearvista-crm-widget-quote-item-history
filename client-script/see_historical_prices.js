@@ -95,39 +95,35 @@ try {
   var quoteNumber = resolveQuoteNumber(values);
   console.log("CS: quote id '" + quoteId + "', quote number '" + quoteNumber + "'");
 
-  if (!quoteId && !quoteNumber) {
-    // Neither identifier is available - an unsaved quote has no number yet.
-    ZDK.Client.showMessage(
-      "Could not identify this quote, so item history cannot be loaded. If the quote has not been saved yet, save it and try again.",
-      "error",
-    );
-  } else {
-    ZDK.Client.openPopup(
-      {
-        api_name: "See_Historical_Sale_Price",
-        type: "widget",
-        header: "See Historical Sale Price",
-        animation_type: 1,
-        close_icon: true,
-        close_on_escape: true,
-        height: "860px",
-        width: "1450px",
-        left: "center",
+  // Open regardless of what could be read here. The widget accepts EntityId
+  // from PageLoad as well as these values, and when it can identify nothing it
+  // displays the payload it received - which is the only way to see what a
+  // popup-launched widget is actually given. Blocking here would hide that.
+  ZDK.Client.openPopup(
+    {
+      api_name: "See_Historical_Sale_Price",
+      type: "widget",
+      header: "See Historical Sale Price",
+      animation_type: 1,
+      close_icon: true,
+      close_on_escape: true,
+      height: "860px",
+      width: "1450px",
+      left: "center",
+    },
+    {
+      data: {
+        action: "item_history",
+        quote_id: quoteId,
+        quote_number: quoteNumber,
+        // Diagnostic: what the form exposed, echoed by the widget if it still
+        // cannot identify the quote, so the console is not required.
+        form_keys: formKeys,
       },
-      {
-        data: {
-          action: "item_history",
-          quote_id: quoteId,
-          quote_number: quoteNumber,
-          // Diagnostic: lets the widget say what the form exposed if it still
-          // cannot identify the quote, without needing the console.
-          form_keys: formKeys,
-        },
-        wait: true,
-      },
-    );
-    console.log("CS: Item History popup closed");
-  }
+      wait: true,
+    },
+  );
+  console.log("CS: Item History popup closed");
 } catch (err) {
   // Closing the popup with the X rejects with widget_closed - not an error.
   if (err && err.toString().indexOf("widget_closed") !== -1) {
