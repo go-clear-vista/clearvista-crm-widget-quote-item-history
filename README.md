@@ -62,9 +62,18 @@ have no way to read the quote or call its backend. The `api_name` in the script
 must therefore be the **widget's** API name from Setup → Developer Space →
 Widgets, not the button's.
 
-The widget takes its record id from `PageLoad`'s `EntityId`, and also accepts
-`data.quote_id` from the `openPopup` payload or `?id=` on the URL, so it works
-under either button shape.
+**A widget opened by `openPopup` does not receive `EntityId`** - that only
+arrives for a widget-action button. The Client Script must therefore read the
+record id from the page and pass it in the `data` payload. ZDK exposes the id
+differently across versions, so the script tries each known form
+(`getRecord().get('id')`, `getRecord().getValues().id`, `getRecord().id`,
+`getField('id').getValue()`, `getRecordId()`) and logs which one worked.
+
+On the widget side the payload is searched rather than assumed: any of
+`EntityId`, `entity_id`, `quote_id`, `record_id`, `recordId` or `id` holding a
+long numeric value is accepted, at any nesting depth, plus `?id=` on the URL.
+If nothing is found the on-screen error quotes the payload CRM actually sent,
+so the shape can be diagnosed without the console.
 
 ### Table layout
 
@@ -266,6 +275,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.2.1
+- **Version**: 1.3.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

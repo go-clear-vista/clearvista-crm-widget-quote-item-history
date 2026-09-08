@@ -1187,19 +1187,49 @@ var sdkReady = (typeof ZOHO !== "undefined") && !!(ZOHO.embeddedApp);
 // A widget-action button supplies the record as EntityId. A Client Script
 // popup (ZDK.Client.openPopup) may instead pass it in the data payload, so
 // accept both, plus ?id= on the URL as a last resort.
-function resolveRecordId(data){
-  if(data){
-    if(data.EntityId){
-      return Array.isArray(data.EntityId) ? data.EntityId[0] : data.EntityId;
-    }
-    if(data.entity_id) return data.entity_id;
+var ID_KEYS = ["EntityId","entity_id","quote_id","record_id","recordId","id"];
 
-    var payload = data.data || data.Data || null;
-    if(payload){
-      var candidate = payload.quote_id || payload.record_id || payload.id || payload.EntityId;
-      if(candidate) return Array.isArray(candidate) ? candidate[0] : candidate;
+// Walk the PageLoad payload for anything that looks like a record id. A
+// widget-action button supplies EntityId at the top level; an openPopup
+// payload nests it, and the nesting depth varies by ZDK version, so search
+// rather than assume a shape.
+function findRecordId(node, depth){
+  if(node === null || node === undefined || depth > 4) return null;
+
+  if(Array.isArray(node)){
+    for(var i = 0; i < node.length; i++){
+      var fromItem = findRecordId(node[i], depth + 1);
+      if(fromItem) return fromItem;
+    }
+    return null;
+  }
+
+  if(typeof node !== "object"){
+    // A bare CRM record id is a long numeric string.
+    return /^\d{8,}$/.test(String(node)) ? String(node) : null;
+  }
+
+  for(var k = 0; k < ID_KEYS.length; k++){
+    var value = node[ID_KEYS[k]];
+    if(value === null || value === undefined) continue;
+    if(Array.isArray(value)) value = value[0];
+    if(value !== "" && /^\d{8,}$/.test(String(value))) return String(value);
+  }
+
+  for(var key in node){
+    if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    var nested = node[key];
+    if(nested && typeof nested === "object"){
+      var found = findRecordId(nested, depth + 1);
+      if(found) return found;
     }
   }
+  return null;
+}
+
+function resolveRecordId(data){
+  var found = findRecordId(data, 0);
+  if(found) return found;
 
   var match = String(window.location.search || "").match(/[?&](?:id|quote_id|record_id)=(\d+)/);
   return match ? match[1] : null;
@@ -1215,7 +1245,10 @@ async function onPageLoad(data){
 
   try {
     if(!recordId){
-      throw new Error("No quote record ID was supplied. If this widget is opened from a Client Script, pass the record id as data.quote_id in the openPopup call.");
+      var seen = "";
+      try { seen = JSON.stringify(data); } catch(ignored){ seen = String(data); }
+      if(seen && seen.length > 400) seen = seen.slice(0,400) + "...";
+      throw new Error("No quote record ID was supplied. The Client Script must pass it as data.quote_id in its openPopup call - see client-script/see_historical_prices.js. CRM sent: " + seen);
     }
 
     var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });

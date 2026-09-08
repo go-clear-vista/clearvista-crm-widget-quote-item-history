@@ -2,6 +2,23 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.3.0] - 2026-09-08
+
+### Fixed
+- "No quote record ID was supplied" when opened from the Client Script. A
+  widget opened by `openPopup` does not receive `PageLoad`'s `EntityId`, and
+  the script's single attempt at reading the record id returned empty, so
+  nothing reached the widget.
+  - The script now tries every known ZDK form for the record id and logs which
+    one worked, and refuses to open the popup with an empty id rather than
+    opening a widget that cannot load.
+  - The widget searches the payload for any of `EntityId`, `entity_id`,
+    `quote_id`, `record_id`, `recordId` or `id` holding a long numeric value,
+    at any nesting depth, instead of assuming a shape. Verified against six
+    payload shapes.
+  - When no id is found, the on-screen error quotes the payload CRM sent, so
+    the shape can be diagnosed without console access.
+
 ## [1.2.1] - 2026-09-08
 
 ### Changed
