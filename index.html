@@ -392,7 +392,8 @@
       border-radius:999px;
       font-size:11.5px;
       font-weight:700;
-      white-space:nowrap;
+      white-space:normal;
+      text-align:left;
       background:#f1f5f9;
       color:#334155;
     }
@@ -1140,19 +1141,39 @@ el("timeframe").addEventListener("change", render);
 // too narrow for ten columns. Ask the SDK to widen it to fit the screen, and
 // fall back silently when the method is unavailable.
 function resizePopup(){
+  if(typeof ZOHO === "undefined" || !ZOHO.CRM || !ZOHO.CRM.UI) return;
+
+  var avail  = (window.screen && window.screen.availWidth)  || 1440;
+  var availH = (window.screen && window.screen.availHeight) || 900;
+
+  var width  = Math.max(1120, Math.min(1560, avail  - 100));
+  var height = Math.max(640,  Math.min(940,  availH - 140));
+
+  // Which of these a button widget honours depends on how the button was
+  // configured, so try both and log what each one did. A widget-action button
+  // renders in a fixed Zoho modal that may ignore both; a Client Script popup
+  // is sized by its own openPopup call instead.
   try {
-    if(typeof ZOHO === "undefined" || !ZOHO.CRM || !ZOHO.CRM.UI ||
-       !ZOHO.CRM.UI.Popup || !ZOHO.CRM.UI.Popup.resize) return;
-
-    var avail  = (window.screen && window.screen.availWidth)  || 1440;
-    var availH = (window.screen && window.screen.availHeight) || 900;
-
-    var width  = Math.max(1120, Math.min(1560, avail  - 100));
-    var height = Math.max(640,  Math.min(940,  availH - 140));
-
-    ZOHO.CRM.UI.Popup.resize({ height: height + "px", width: width + "px" });
+    if(ZOHO.CRM.UI.Resize){
+      ZOHO.CRM.UI.Resize({ height: height + "px", width: width + "px" })
+        .then(function(r){ console.log("ZOHO.CRM.UI.Resize ->", r); })
+        .catch(function(e){ console.log("ZOHO.CRM.UI.Resize rejected:", e); });
+    } else {
+      console.log("ZOHO.CRM.UI.Resize not available in this SDK build.");
+    }
   } catch(error){
-    console.log("Popup resize unavailable:", error);
+    console.log("ZOHO.CRM.UI.Resize threw:", error);
+  }
+
+  try {
+    if(ZOHO.CRM.UI.Popup && ZOHO.CRM.UI.Popup.resize){
+      ZOHO.CRM.UI.Popup.resize({ height: height + "px", width: width + "px" });
+      console.log("ZOHO.CRM.UI.Popup.resize requested", width + "x" + height);
+    } else {
+      console.log("ZOHO.CRM.UI.Popup.resize not available in this SDK build.");
+    }
+  } catch(error){
+    console.log("ZOHO.CRM.UI.Popup.resize threw:", error);
   }
 }
 

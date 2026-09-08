@@ -36,6 +36,25 @@ Built to match the look and feel of the other ClearVista CRM widgets
 | Discount | Line discount amount, with the effective percentage beneath |
 | Price After Discount | **Per-unit** price after discount |
 
+### Popup width
+
+A custom button can open this page two ways, and only one of them lets you
+choose the popup size:
+
+| Button `action` | Sizing |
+| --- | --- |
+| `widget` | Zoho renders the page in its own fixed modal (roughly 880px wide). `ZOHO.CRM.UI.Resize()` and `ZOHO.CRM.UI.Popup.resize()` are called on load but a widget-action modal may ignore both. |
+| `cscript` | A Client Script opens the popup and passes explicit `height`/`width`, so the size is yours to set. |
+
+The table needs about 1000px for its ten columns, so in the fixed modal it
+scrolls horizontally. To get a wider box, drive the button from a Client Script
+that opens **the registered widget** (not a bare URL) with explicit dimensions -
+the same approach the org's `Distributor_Search` button uses.
+
+Opening a bare URL instead of the registered widget loses the Embedded App SDK
+context, and with it `ZOHO.CRM.API` and `ZOHO.CRM.FUNCTIONS` - the widget would
+have no way to read the quote or call its backend.
+
 ### Table layout
 
 The table uses `table-layout: fixed` with percentage column widths, so the ten
@@ -176,9 +195,8 @@ Then set the two configuration constants at the top of `quote_item_history`:
 - Create a button named **Item History**
 - **Action**: Widget → the Pages URL above
 - **Placement**: View Layout (quote detail page)
-- Popup size: the widget calls `ZOHO.CRM.UI.Popup.resize()` on load to widen
-  itself to fit the screen, so the size set here matters less; **1350 × 720** is
-  a good starting value for clients where resize is unavailable
+- Popup size: see **Popup width** below - a widget-action button renders in a
+  fixed Zoho modal that the SDK resize calls may not honour
 - Assign the profiles and Quote layouts that should see the button
 
 ## API requirements
@@ -237,6 +255,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.1.1
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

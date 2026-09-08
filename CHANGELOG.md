@@ -2,6 +2,21 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.1.1] - 2026-09-08
+
+### Changed
+- The resize attempt now tries `ZOHO.CRM.UI.Resize()` as well as
+  `ZOHO.CRM.UI.Popup.resize()`, and logs what each call did, since which one a
+  button honours depends on how the button was configured.
+- Status and document-type pills wrap instead of forcing `nowrap`, so a pill
+  cannot spill out of a narrow column.
+
+### Documentation
+- Added a "Popup width" section: a `widget`-action button renders in a fixed
+  Zoho modal, while a `cscript` button opens a popup whose dimensions the script
+  sets. Records that a Client Script must open the registered widget rather than
+  a bare URL, or the page loses the Embedded App SDK and cannot reach CRM.
+
 ## [1.1.0] - 2026-09-08
 
 ### Added
