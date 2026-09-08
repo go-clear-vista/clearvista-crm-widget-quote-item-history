@@ -71,7 +71,12 @@ string automation.quote_item_history(String quote_id)
 			parameters:ownBody.toString()
 			connection:"crm_api_v21"
 		];
-		for each ownLine in ifnull(ownResp.get("data"),List())
+		ownData = ownResp.get("data");
+		if(ownData == null)
+		{
+			warnings.add("The Quoted_Items query returned no data. CRM replied: " + ownResp.toString());
+		}
+		for each ownLine in ifnull(ownData,List())
 		{
 			product = ownLine.get("Product_Name");
 			if(product == null)
@@ -150,7 +155,12 @@ string automation.quote_item_history(String quote_id)
 					parameters:body.toString()
 					connection:"crm_api_v21"
 				];
-				for each line in ifnull(response.get("data"),List())
+				pageData = response.get("data");
+				if(pageData == null && pageOffset == 0)
+				{
+					warnings.add("The item history query returned no data. CRM replied: " + response.toString());
+				}
+				for each line in ifnull(pageData,List())
 				{
 					quoteLines.add(line);
 					parent = line.get("Parent_Id");
@@ -211,7 +221,12 @@ string automation.quote_item_history(String quote_id)
 							parameters:headerBody.toString()
 							connection:"crm_api_v21"
 						];
-						for each record in ifnull(headerResp.get("data"),List())
+						headerData = headerResp.get("data");
+						if(headerData == null)
+						{
+							warnings.add("The quote header query returned no data. CRM replied: " + headerResp.toString());
+						}
+						for each record in ifnull(headerData,List())
 						{
 							recordId = ifnull(record.get("id"),"").toString();
 							if(recordId == "")
@@ -417,7 +432,7 @@ string automation.quote_item_history(String quote_id)
 	}
 	else
 	{
-		warnings.add("No line items with a linked product were found on this quote, so there is nothing to build a history from.");
+		warnings.add("No line items with a linked product were found for quote id " + quote_id.trim() + ", so there is nothing to build a history from.");
 	}
 
 	// ---- 5. make every free-text value safe to embed in JSON ------------ *

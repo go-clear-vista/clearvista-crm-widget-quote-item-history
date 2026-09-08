@@ -116,6 +116,16 @@ settings:
 Set Return Type with the pencil icon next to the function name. The widget
 reads the function's output, so a `void` function returns it nothing.
 
+#### The connection needs `ZohoCRM.coql.READ`
+
+Every query this function makes goes through the COQL endpoint, which requires
+the **`ZohoCRM.coql.READ`** scope specifically. `ZohoCRM.modules.ALL` does *not*
+cover it - a connection with broad module access but no `coql.READ` returns
+`OAUTH_SCOPE_MISMATCH`, which reads as an empty result rather than an error.
+
+Check the connection's scopes in Setup → Developer Hub → Connections; if
+`coql.READ` is absent, edit the connection to add it and re-authorise.
+
 **Then enable REST API on the function**, or the widget's call is rejected with
 `NOT_ACTIVE`. Open the function in Setup → Developer Hub → Functions and switch
 REST API on (OAuth). You can confirm it took by comparing against the existing
@@ -148,7 +158,7 @@ Then set the two configuration constants at the top of `quote_item_history`:
 
 | Setting | Where | Purpose |
 | --- | --- | --- |
-| Connection link name | the `connection:` line of both `invokeurl` blocks | A CRM connection with the `ZohoCRM.coql.READ` scope (Setup → Developer Hub → Connections). Required for the sales quote history, and must be a literal. |
+| Connection link name | the `connection:` line of all three `invokeurl` blocks | A CRM connection carrying **`ZohoCRM.coql.READ`** (Setup → Developer Hub → Connections). Must be a literal. |
 | `BOOKS_ORG_ID` | near the top of the function | Zoho Books organization ID. Set it to `""` to launch with CRM quotes only; the widget will say so in its banner. |
 
 ### 3. Create the button
@@ -201,7 +211,8 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is empty in the function |
 | Table shows quotes but no orders/invoices | The CRM SKU has no matching Books item, or the Books item has no documents in the selected timeframe |
 | "No item history found" | None of this quote's products appear on any other document yet |
-| Banner: "No line items with a linked product were found" | The quote's line items have no linked product, or the COQL read of `Quoted_Items` failed - check the banner for a connection error alongside it |
+| Banner: "No line items with a linked product were found" | Usually the connection is missing `ZohoCRM.coql.READ` - the banner beside it quotes CRM's reply, look for `OAUTH_SCOPE_MISMATCH` |
+| Banner: "... CRM replied: ... OAUTH_SCOPE_MISMATCH" | Add `ZohoCRM.coql.READ` to the connection and re-authorise |
 | Widget shows sample data inside CRM | The Embedded App SDK could not load - check that `live.zwidgets.com` is reachable |
 | Last columns cut off | Increase the widget popup width, or scroll the table horizontally |
 
@@ -216,6 +227,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.7
+- **Version**: 1.0.8
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

@@ -2,6 +2,20 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.8] - 2026-09-08
+
+### Fixed
+- A COQL query that failed on authorisation looked like an empty result. The
+  endpoint returns an error body with no `data` key, which the loops read as
+  zero rows, so a scope problem surfaced as "this quote has no line items".
+  All three queries now report CRM's actual reply in the banner when `data` is
+  absent, and the empty-items warning names the quote id it queried.
+
+### Documentation
+- Recorded that the connection must carry **`ZohoCRM.coql.READ`** specifically.
+  `ZohoCRM.modules.ALL` does not cover the COQL endpoint, and a connection with
+  broad module access but no `coql.READ` fails with `OAUTH_SCOPE_MISMATCH`.
+
 ## [1.0.7] - 2026-09-08
 
 ### Fixed
