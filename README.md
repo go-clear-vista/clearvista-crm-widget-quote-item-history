@@ -99,6 +99,10 @@ otherwise "Price After Discount" cannot wrap and pushes past the table edge.
 
 Deluge is not JavaScript, and two limits shape this function:
 
+- **A bare boolean variable cannot be a whole `if` condition.** `if(myFlag)`
+  fails to compile with "Improper Statement ... incomplete expression", while
+  `if(!myFlag)` and `if(myFlag && x > 0)` are fine - an operator has to be
+  present. This function inlines its tests rather than holding them in flags.
 - **No `while` loop.** The COQL paging walks a fixed `pageOffsets` list instead,
   capping the CRM quote history at 10 pages x 200 rows = 2000 line items.
 - **`connection:` on an `invokeurl` must be a literal**, not a variable - Deluge
@@ -264,6 +268,7 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | "Improper code format" when saving the function | The signature must be the first line and only one function may be defined |
 | "no viable alternative at input 'string ...'" (Line 1 or 3) | The category word on line 1 does not match the function's configured Category |
 | "no viable alternative at input 'try ... while ...'" | Deluge has no `while` loop; fixed in 1.0.4 - make sure you are pasting the current file |
+| "Improper Statement ... incomplete expression" on an `if` | A bare boolean variable as the whole condition - give it an operator, or inline the test |
 | "'connections' value ... does not match ... 'CONNECTION LINKNAME'" | `connection:` was given a variable; it must be a quoted literal - fixed in 1.0.5 |
 | "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
 | Banner: "Sales quote history could not be loaded" | The connection named in the `invokeurl` blocks is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
@@ -286,6 +291,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.4.1
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

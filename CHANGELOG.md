@@ -2,6 +2,16 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.4.1] - 2026-09-08
+
+### Fixed
+- The backend would not compile: `if(hasProductIds)` failed with "Improper
+  Statement ... incomplete expression". Deluge will not take a bare boolean
+  variable as an entire condition, though it accepts one carrying an operator -
+  `if(!morePages)` and `if(crmLoaded && ...)` compile in this same function.
+  The two flags are gone and their tests are inlined in the shape the rest of
+  the function already uses.
+
 ## [1.4.0] - 2026-09-08
 
 ### Added

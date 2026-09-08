@@ -28,10 +28,7 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	items = List();
 	warnings = List();
 
-	hasQuoteId = (quote_id != null && quote_id.trim() != "");
-	hasProductIds = (product_ids != null && product_ids.trim() != "");
-
-	if(!hasQuoteId && !hasProductIds)
+	if((quote_id == null || quote_id.trim() == "") && (product_ids == null || product_ids.trim() == ""))
 	{
 		result.put("success",false);
 		result.put("message","Supply either quote_id or product_ids.");
@@ -45,7 +42,7 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	quoteAccount = "";
 	quoteSubject = "";
 
-	if(hasQuoteId)
+	if(quote_id != null && quote_id.trim() != "")
 	{
 		quote = zoho.crm.getRecordById("Quotes",quote_id.trim().toLong());
 		if(quote == null || !quote.containKey("id"))
@@ -73,7 +70,7 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	productIds = List();
 	skuById = Map();
 
-	if(hasProductIds)
+	if(product_ids != null && product_ids.trim() != "")
 	{
 		for each rawProductId in product_ids.trim().toList(",")
 		{
