@@ -3,9 +3,11 @@ string automation.quote_item_history(String quote_id)
 	// Backend for the Item History widget (launched from a sales quote).
 	// Return type String; ONE argument, quote_id (String), carrying either:
 	//   a quote record id       - the line items are derived from the quote
-	//   "products=<id,id,...>"  - CRM product record ids, for callers that can
-	//                             read the quote's subform but not the quote
-	//                             record itself (the edit layout)
+	//   "rows=<id,id,...>"      - Quoted_Items ROW ids, which resolve back to
+	//                             the quote, giving the header details too
+	//   "products=<id,id,...>"  - CRM product record ids, the last resort when
+	//                             neither the quote nor its row ids are
+	//                             readable; no quote number or account then
 	// One argument, not two, because Zoho saves a function's argument list and
 	// its code together: a new argument will not register until the code
 	// compiles, and the code cannot compile until it is registered.
@@ -20,7 +22,7 @@ string automation.quote_item_history(String quote_id)
 	// COQL connection: "crm_api_v21" - needs scope ZohoCRM.coql.READ, and is
 	//   used to query the Quoted_Items subform module across all quotes. Deluge
 	//   requires a LITERAL connection link name on an invokeurl, so if the
-	//   connection is renamed, update all three invokeurl blocks below by hand.
+	//   connection is renamed, update all four invokeurl blocks below by hand.
 	// BOOKS_ORG_ID   - Zoho Books organization ID. Set it to "" to run against
 	//                  CRM sales quotes only; the widget says so in a banner.
 	// Neither failure is fatal - the widget renders whatever it could load.
@@ -48,13 +50,74 @@ string automation.quote_item_history(String quote_id)
 	// "products=" prefix is unambiguous.
 	quoteRecordId = "";
 	suppliedProductIds = "";
+	suppliedRowIds = "";
 	if(identifier.startsWith("products="))
 	{
 		suppliedProductIds = identifier.subString(9,identifier.length()).trim();
 	}
+	else if(identifier.startsWith("rows="))
+	{
+		suppliedRowIds = identifier.subString(5,identifier.length()).trim();
+	}
 	else
 	{
 		quoteRecordId = identifier;
+	}
+
+	// Row ids resolve back to their parent quote, which recovers the quote
+	// number and account that "products=" alone cannot supply.
+	if(suppliedRowIds != "")
+	{
+		try
+		{
+			rowClause = "";
+			for each rawRowId in suppliedRowIds.toList(",")
+			{
+				trimmedRowId = rawRowId.trim();
+				if(trimmedRowId != "")
+				{
+					if(rowClause != "")
+					{
+						rowClause = rowClause + ",";
+					}
+					rowClause = rowClause + "'" + trimmedRowId + "'";
+				}
+			}
+			if(rowClause != "")
+			{
+				rowCoql = "select Parent_Id from Quoted_Items where id in (" + rowClause + ") limit 0, 200";
+				rowBody = Map();
+				rowBody.put("select_query",rowCoql);
+				rowResp = invokeurl
+				[
+					url :"https://www.zohoapis.com/crm/v7/coql"
+					type :POST
+					parameters:rowBody.toString()
+					connection:"crm_api_v21"
+				];
+				for each rowLine in ifnull(rowResp.get("data"),List())
+				{
+					rowParent = rowLine.get("Parent_Id");
+					if(rowParent != null)
+					{
+						candidateId = ifnull(rowParent.get("id"),"").toString();
+						if(candidateId != "")
+						{
+							quoteRecordId = candidateId;
+							break;
+						}
+					}
+				}
+			}
+			if(quoteRecordId == "")
+			{
+				warnings.add("The quote could not be identified from its line item row ids.");
+			}
+		}
+		catch (e)
+		{
+			warnings.add("Resolving the quote from its line item rows failed: " + e.toString());
+		}
 	}
 
 	// ---- 1. the quote this widget was launched from ---------------------

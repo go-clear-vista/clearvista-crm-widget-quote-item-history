@@ -18,8 +18,9 @@ Built to match the look and feel of the other ClearVista CRM widgets
   history, **defaulting to this quote's account alone**, so the first thing a
   user sees is what this customer has paid. Widening to other accounts is a
   deliberate step, and the row count says "for 1 account" while it is narrowed.
-  With no account known - the edit layout cannot read the quote - it defaults
-  to all accounts rather than showing nothing
+  Where that default would show nothing - the account has no prior history, or
+  the quote could not be read - it ticks every account and says so in a note
+  under the filters, rather than opening on an empty table
 - **Live table** - re-filters and re-sorts instantly as the filters change; no reload
 - **Sortable columns** - click any column header to sort; defaults to newest first
 - **Colour-coded pills** - document type and stage/status use the same colour map as
@@ -86,7 +87,14 @@ The backend accepts either identifier through its **one** argument, `quote_id`:
 | Value | Meaning |
 | --- | --- |
 | a record id | the line items are derived from the quote |
-| `products=<id,id,...>` | CRM product record ids, for callers that can read the subform but not the quote |
+| `rows=<id,id,...>` | `Quoted_Items` **row** ids, which resolve back to the quote - so the quote number and account come through too |
+| `products=<id,id,...>` | CRM product record ids; the last resort, and the only form that yields no quote number or account |
+
+The Client Script sends row ids and products from the subform, and the widget
+prefers them in that order. Row ids matter because the quote number in the
+footer and the account-filter default both come from the quote record - with
+only product ids the history still loads, but the footer shows `-` and the
+account filter opens on all accounts.
 
 **Why one argument and not two:** Zoho saves a function's argument list and its
 code together, so a second argument can never be added to an existing function.
@@ -308,6 +316,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.6.0
+- **Version**: 1.7.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

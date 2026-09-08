@@ -61,6 +61,19 @@ function readSubformRows() {
   return rows;
 }
 
+// Each subform row's own record id. These resolve back to the parent quote
+// server-side, which is how the quote number and account are recovered on a
+// layout that cannot read the quote record itself.
+function collectRowIds(rows) {
+  var ids = [];
+  for (var i = 0; i < rows.length; i++) {
+    var id = rows[i].id || rows[i].Id || rows[i].ID;
+    if (id && LONG_ID.test(String(id))) ids.push(String(id));
+  }
+  console.log("CS: collected " + ids.length + " subform row id(s)");
+  return ids;
+}
+
 // The quote's own id, if any row carries a reference back to the parent.
 function findParentId(rows) {
   var keys = ["Parent_Id", "parent_id", "Parent_ID"];
@@ -94,10 +107,11 @@ function collectProducts(rows) {
 try {
   var rows = readSubformRows();
   var products = collectProducts(rows);
+  var rowIds = collectRowIds(rows);
   var quoteId = findParentId(rows);
   var rowKeys = rows.length > 0 ? Object.keys(rows[0]).join(",") : "";
 
-  console.log("CS: quote id '" + quoteId + "', products " + products.length);
+  console.log("CS: quote id '" + quoteId + "', row ids " + rowIds.length + ", products " + products.length);
 
   ZDK.Client.openPopup(
     {
@@ -115,6 +129,7 @@ try {
       data: {
         action: "item_history",
         quote_id: quoteId,
+        row_ids: rowIds.join(","),
         products: products,
         // Diagnostics, echoed by the widget if it still cannot proceed.
         row_count: rows.length,

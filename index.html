@@ -276,6 +276,18 @@
       color:var(--muted);
     }
 
+    .filter-note{
+      margin-top:14px;
+      padding:9px 12px;
+      border:1px solid #dbe6f8;
+      border-left:3px solid var(--blue);
+      border-radius:10px;
+      background:#f5f9ff;
+      color:#31538f;
+      font-size:12.5px;
+      line-height:1.5;
+    }
+
     /* ---- toolbar ---- */
     .toolbar{
       display:flex;
@@ -613,6 +625,8 @@
       </div>
 
     </div>
+
+    <div class="filter-note" id="filterNote" hidden></div>
 
     <div class="warn" id="warnBox"></div>
 
@@ -1193,21 +1207,36 @@ function applyPayload(payload){
     ? String(payload.quote.account_name).trim()
     : "";
 
+  // Does this quote's account actually appear in the history?
+  var currentHasHistory = !!(current && accountSeen[current]);
+
   if(current && !accountSeen[current]){
     accountSeen[current] = true;
     accountNames.push(current);
   }
   accountNames.sort();
 
-  // Default to this quote's account only - widening to other accounts is a
-  // deliberate step, so a cross-account comparison is never accidental. With
-  // no known account (the edit layout cannot read the quote) show everything.
-  var defaultAccounts = (current && accountSeen[current]) ? [current] : accountNames;
+  // Default to this quote's account alone, so widening to others is a
+  // deliberate step. Where that would show nothing - the account has no prior
+  // history, or the quote could not be read at all - tick everything and say
+  // so, rather than opening on an empty table.
+  var defaultAccounts = currentHasHistory ? [current] : accountNames;
 
   accountFilter.render(
     accountNames.map(function(name){ return { value:name, label:name }; }),
     defaultAccounts
   );
+
+  var note = el("filterNote");
+  if(allRows.length && !currentHasHistory){
+    note.textContent = current
+      ? "No sales history for " + current + " - showing all account history."
+      : "No sales history for the account - showing all account history.";
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+    note.textContent = "";
+  }
 
   setWarning(payload.warnings);
   render();
@@ -1323,6 +1352,29 @@ function findRecordId(node, depth){
   return null;
 }
 
+// Quoted_Items row ids, sent by the Client Script from the subform.
+function findRowIds(node, depth){
+  if(node === null || node === undefined || depth > 4) return [];
+
+  if(typeof node === "object" && !Array.isArray(node)){
+    var direct = node.row_ids || node.rowIds;
+    if(direct){
+      var list = Array.isArray(direct) ? direct : String(direct).split(",");
+      var cleaned = list.map(function(v){ return String(v).trim(); })
+                        .filter(function(v){ return /^\d{6,}$/.test(v); });
+      if(cleaned.length) return cleaned;
+    }
+    for(var key in node){
+      if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+      if(node[key] && typeof node[key] === "object"){
+        var found = findRowIds(node[key], depth + 1);
+        if(found.length) return found;
+      }
+    }
+  }
+  return [];
+}
+
 function findProducts(node, depth){
   if(node === null || node === undefined || depth > 4) return null;
 
@@ -1434,14 +1486,17 @@ async function onPageLoad(data){
     }
 
     // The edit layout exposes the Quoted_Items subform but not the quote, so
-    // the Client Script can send the products even with no quote id.
+    // the Client Script can send its row ids and products even with no quote
+    // id. Row ids are preferred: the backend resolves them to the quote, which
+    // recovers the quote number and account that products alone cannot.
+    var rowIds = findRowIds(data, 0);
     var products = findProducts(data, 0);
     var productIds = (products || []).map(function(p){ return String(p.id); })
                                      .filter(function(id){ return /^\d{6,}$/.test(id); });
     suppliedProductNames = (products || []).map(function(p){ return p.name ? String(p.name) : ""; })
                                            .filter(function(name){ return !!name; });
 
-    if(!recordId && !productIds.length){
+    if(!recordId && !rowIds.length && !productIds.length){
       var seen = "";
       try { seen = JSON.stringify(data); } catch(ignored){ seen = String(data); }
       if(seen && seen.length > 900) seen = seen.slice(0,900) + "...";
@@ -1460,7 +1515,10 @@ async function onPageLoad(data){
     // Zoho cannot register a second argument on an existing function - it will
     // not persist until the code compiles, and the code cannot compile until
     // it is registered - so the identifier is encoded instead.
-    var identifier = recordId ? String(recordId) : ("products=" + productIds.join(","));
+    var identifier;
+    if(recordId)            identifier = String(recordId);
+    else if(rowIds.length)  identifier = "rows=" + rowIds.join(",");
+    else                    identifier = "products=" + productIds.join(",");
 
     var payload = await executeFunction(FUNCTION_NAME, { quote_id: identifier });
 
@@ -1482,6 +1540,7 @@ async function onPageLoad(data){
     itemFilter.render([]);
     docFilter.render(DOC_TYPES);
     accountFilter.render([]);
+    el("filterNote").hidden = true;
     render();
     setStatus(error && error.message ? error.message : "Unable to load item history.", "error");
   }

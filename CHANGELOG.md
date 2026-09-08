@@ -2,6 +2,25 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.7.0] - 2026-09-08
+
+### Fixed
+- The footer showed `-` instead of the quote number, and the account filter
+  opened on all 20 accounts instead of this quote's. Both had one cause: the
+  Client Script could only supply product ids, so the backend never read the
+  quote record and had neither a quote number nor an account to work with.
+  - `quote_id` accepts a new `rows=<id,id,...>` form carrying `Quoted_Items`
+    **row** ids, which the backend resolves back to the parent quote - so the
+    header details come through on a layout that cannot read the quote itself.
+  - The Client Script now sends the subform's row ids, and the widget prefers
+    a record id, then row ids, then products.
+
+### Added
+- A note under the filters when the account default cannot be honoured:
+  "No sales history for <account> - showing all account history", with every
+  account ticked, instead of silently opening on all accounts. It also covers
+  the case where the quote could not be read at all.
+
 ## [1.6.0] - 2026-09-08
 
 ### Added
