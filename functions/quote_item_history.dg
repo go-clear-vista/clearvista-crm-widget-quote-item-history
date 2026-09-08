@@ -1,40 +1,20 @@
-string standalone.quote_item_history(String quote_id)
+string automation.quote_item_history(String quote_id)
 {
-	/* ---------------------------------------------------------------------
-	 * Backend for the "Item History" widget.
-	 *
-	 * Zoho's function editor accepts exactly ONE function per definition and
-	 * requires the signature to be the first line, so everything lives in this
-	 * one function - there are no helpers to create separately.
-	 *
-	 * Create it as:
-	 *   Return type : String
-	 *   Argument    : quote_id (String)
-	 * The widget calls it with:
-	 *   ZOHO.CRM.FUNCTIONS.execute("quote_item_history",
-	 *       { arguments: JSON.stringify({ quote_id: "<record id>" }) });
-	 *
-	 * Returns JSON:
-	 * { "success": true,
-	 *   "quote":   { id, quote_number, subject, account_name },
-	 *   "items":   ["SKU", ...],
-	 *   "rows":    [ { item_name, description, item_notes, doc_type, doc_number,
-	 *                  date, account_name, status, item_price, discount,
-	 *                  line_total, quantity, total_after_discount } ],
-	 *   "warnings":["..."] }
-	 *
-	 * Money convention (see CLAUDE.md): item_price is the per-unit list price
-	 * and total_after_discount is the DISCOUNTED EXTENDED total. The widget
-	 * derives the true per-unit price as total_after_discount / quantity,
-	 * because the stored item price is sometimes a pre-discount list price.
-	 *
-	 * Setup:
-	 *   CRM_CONNECTION - a connection with scope ZohoCRM.coql.READ, used to
-	 *                    query the Quoted_Items subform module across quotes.
-	 *   BOOKS_ORG_ID   - Zoho Books organization ID. Leave blank to run against
-	 *                    CRM sales quotes only; the widget says so in a banner.
-	 * Both failures are non-fatal - the widget renders whatever it could load.
-	 * --------------------------------------------------------------------- */
+	// Backend for the Item History widget (launched from a sales quote).
+	// Configure this function as: Return type String, argument quote_id (String).
+	// The category word on line 1 must match this function's Category in CRM.
+	//
+	// Returns a JSON string: success, quote, items, rows, warnings.
+	// item_price is the per-unit list price; total_after_discount is the
+	// discounted EXTENDED total. The widget derives the per-unit price as
+	// total_after_discount / quantity, because the stored item price is
+	// sometimes a pre-discount list price (see CLAUDE.md).
+	//
+	// CRM_CONNECTION - connection with scope ZohoCRM.coql.READ, used to query
+	//                  the Quoted_Items subform module across all quotes.
+	// BOOKS_ORG_ID   - Zoho Books organization ID. Leave blank to run against
+	//                  CRM sales quotes only; the widget says so in a banner.
+	// Neither failure is fatal - the widget renders whatever it could load.
 	CRM_CONNECTION = "zoho_crm_conn";
 	BOOKS_ORG_ID = "";
 	MAX_DOCS_PER_TYPE = 60;
@@ -53,7 +33,7 @@ string standalone.quote_item_history(String quote_id)
 	}
 	quoteIdLong = quote_id.trim().toLong();
 
-	/* ---- 1. the quote this widget was launched from --------------------- */
+	// ---- 1. the quote this widget was launched from ---------------------
 	quote = zoho.crm.getRecordById("Quotes",quoteIdLong);
 	if(quote == null || !quote.containKey("id"))
 	{
@@ -73,7 +53,7 @@ string standalone.quote_item_history(String quote_id)
 		quoteAccount = ifnull(quote.get("Account_Name").get("name"),"").toString();
 	}
 
-	/* ---- 2. the items on this quote drive the Item Name checklist -------- */
+	// ---- 2. the items on this quote drive the Item Name checklist --------
 	productIds = List();
 	skuById = Map();
 
@@ -113,7 +93,7 @@ string standalone.quote_item_history(String quote_id)
 			idClause = idClause + "'" + productId + "'";
 		}
 
-		/* ---- 3. CRM sales quote history (COQL over Quoted_Items) -------- */
+		// ---- 3. CRM sales quote history (COQL over Quoted_Items) --------
 		quoteLines = List();
 		parentIds = List();
 		crmLoaded = false;
@@ -164,7 +144,7 @@ string standalone.quote_item_history(String quote_id)
 			warnings.add("Sales quote history could not be loaded (COQL connection '" + CRM_CONNECTION + "'): " + e.toString());
 		}
 
-		/* ---- 3b. parent quote headers, in batches of 100 ---------------- */
+		// ---- 3b. parent quote headers, in batches of 100 ----------------
 		quoteHeaders = Map();
 		if(crmLoaded && parentIds.size() > 0)
 		{
@@ -208,7 +188,7 @@ string standalone.quote_item_history(String quote_id)
 							documentDate = ifnull(record.get("Date_created_on_document"),"").toString();
 							if(documentDate == "")
 							{
-								/* Created_Time is an ISO timestamp - keep the date only. */
+								// Created_Time is an ISO timestamp - keep the date only.
 								documentDate = ifnull(record.get("Created_Time"),"").toString();
 								if(documentDate.length() >= 10)
 								{
@@ -272,7 +252,7 @@ string standalone.quote_item_history(String quote_id)
 			rows.add(row);
 		}
 
-		/* ---- 4. Zoho Books sales orders and invoices -------------------- */
+		// ---- 4. Zoho Books sales orders and invoices --------------------
 		if(BOOKS_ORG_ID == "")
 		{
 			warnings.add("Zoho Books sales orders and invoices are not included: set BOOKS_ORG_ID in the quote_item_history function.");
@@ -304,7 +284,7 @@ string standalone.quote_item_history(String quote_id)
 					}
 					try
 					{
-						/* Books item lookup by SKU - CRM Product_Name == Product_Code == SKU */
+						// Books item lookup by SKU - CRM Product_Name == Product_Code == SKU
 						itemCriteria = Map();
 						itemCriteria.put("name",booksSku);
 						itemResp = zoho.books.getRecords("Items",BOOKS_ORG_ID,itemCriteria);
@@ -327,8 +307,8 @@ string standalone.quote_item_history(String quote_id)
 							continue;
 						}
 
-						/* The item_id filter keeps the follow-up detail calls
-						   bounded to documents that actually contain the item. */
+						// The item_id filter keeps the follow-up detail calls
+						// bounded to documents that actually contain the item.
 						docCriteria = Map();
 						docCriteria.put("item_id",booksItemId);
 						docCriteria.put("per_page",200);
@@ -407,16 +387,16 @@ string standalone.quote_item_history(String quote_id)
 		warnings.add("This quote has no line items with a linked product, so there is nothing to build a history from.");
 	}
 
-	/* ---- 5. make every free-text value safe to embed in JSON ------------ *
-	 * The response is assembled with Map.toString(), which does NOT escape
-	 * characters that are structural in JSON. Real ClearVista data trips this
-	 * constantly - inch marks in product names and quote subjects (65"
-	 * display, Sony 98" Panels) and hard line breaks in the multi-line
-	 * Description field would each produce output the widget cannot parse.
-	 * Rather than escaping, these characters are substituted with safe
-	 * equivalents, which keeps the text readable in the table: a double quote
-	 * becomes two apostrophes, which still reads as an inch mark (65'').
-	 * -------------------------------------------------------------------- */
+	// ---- 5. make every free-text value safe to embed in JSON ------------ *
+	// The response is assembled with Map.toString(), which does NOT escape
+	// characters that are structural in JSON. Real ClearVista data trips this
+	// constantly - inch marks in product names and quote subjects (65"
+	// display, Sony 98" Panels) and hard line breaks in the multi-line
+	// Description field would each produce output the widget cannot parse.
+	// Rather than escaping, these characters are substituted with safe
+	// equivalents, which keeps the text readable in the table: a double quote
+	// becomes two apostrophes, which still reads as an inch mark (65'').
+	// ------------------------------------------------------------
 	textKeys = List();
 	textKeys.add("item_name");
 	textKeys.add("description");

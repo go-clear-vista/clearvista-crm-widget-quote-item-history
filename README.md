@@ -92,18 +92,27 @@ settings:
 | Setting | Value |
 | --- | --- |
 | Function Name / API Name | `quote_item_history` |
-| Category | Standalone (same as the existing `stage_update` function) |
+| Category | `automation` (must match the category word on line 1 of the code) |
 | Return Type | **String** - not the default `void` |
 | Argument | `quote_id`, type **String** |
+
+The Return Type is the one that bites: if it is left as `void`, the editor
+rejects line 1 with *"no viable alternative at input 'string ...'"*, because it
+validates the declared return type against this setting. Change it with the
+pencil icon next to the function name.
 
 Then replace the editor's contents with **all** of `functions/quote_item_history.dg`
 and save. The file is one single function whose signature is its first line,
 which is the format the editor requires:
 
 ```
-string standalone.quote_item_history(String quote_id)
+string automation.quote_item_history(String quote_id)
 { ... }
 ```
+
+The category word must match the function's configured Category - `automation`
+for a function created this way, `standalone` for older ones such as
+`stage_update`. Only that one word changes.
 
 > **If you see "Improper code format":** the editor accepts exactly one function
 > per definition and the signature must be the first thing in it. Make sure you
@@ -157,7 +166,8 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | Symptom | Cause / fix |
 | --- | --- |
 | "The quote_item_history function was not found in CRM" | The Deluge function has not been created yet - see step 2. This is what CRM's raw `INVALID_DATA` response means. |
-| "Improper code format" when saving the function | The signature must be the first line and only one function may be defined; check Return Type is String and the argument `quote_id` exists |
+| "Improper code format" when saving the function | The signature must be the first line and only one function may be defined |
+| "no viable alternative at input 'string ...'" | Return Type is still `void` - set it to String in the function settings |
 | "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
 | Banner: "Sales quote history could not be loaded" | `CRM_CONNECTION` is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
 | Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is still blank in the function |
@@ -177,6 +187,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.2
+- **Version**: 1.0.3
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

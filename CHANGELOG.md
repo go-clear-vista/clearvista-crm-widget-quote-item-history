@@ -2,6 +2,21 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.3] - 2026-09-08
+
+### Changed
+- The backend uses `automation` as its category on line 1, matching how the
+  function is created in this org, and documents that this one word must match
+  the function's configured Category.
+- All `/* ... */` block comments became `//` line comments and the header
+  comment was condensed, to keep the syntax the editor has to parse minimal.
+
+### Documentation
+- Setup and troubleshooting now call out that leaving Return Type as `void`
+  makes the editor reject line 1 with "no viable alternative at input
+  'string ...'", since it validates the declared return type against that
+  setting.
+
 ## [1.0.2] - 2026-09-07
 
 ### Fixed
