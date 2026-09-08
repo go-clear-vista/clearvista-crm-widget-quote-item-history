@@ -112,6 +112,16 @@ settings:
 Set Return Type with the pencil icon next to the function name. The widget
 reads the function's output, so a `void` function returns it nothing.
 
+**Then enable REST API on the function**, or the widget's call is rejected with
+`NOT_ACTIVE`. Open the function in Setup → Developer Hub → Functions and switch
+REST API on (OAuth). You can confirm it took by comparing against the existing
+`stage_update` function, which reports `rest_api_mode: ["Oauth","ZAPI"]`; a
+function that has never been exposed reports `["None"]`.
+
+Zoho registers the argument with underscores stripped (`quoteid`), which is
+expected - the widget sends `quote_id` and CRM normalises the two, exactly as
+the Receive PO widget does with `stage_update`.
+
 Then replace the editor's contents with **all** of `functions/quote_item_history.dg`
 and save. The file is one single function whose signature is its first line,
 which is the format the editor requires:
@@ -177,6 +187,7 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | Symptom | Cause / fix |
 | --- | --- |
 | "The quote_item_history function was not found in CRM" | The Deluge function has not been created yet - see step 2. This is what CRM's raw `INVALID_DATA` response means. |
+| "exists but is not exposed to the API" (`NOT_ACTIVE`) | REST API is off for the function - enable it (OAuth) in the function's settings |
 | "Improper code format" when saving the function | The signature must be the first line and only one function may be defined |
 | "no viable alternative at input 'string ...'" (Line 1 or 3) | The category word on line 1 does not match the function's configured Category |
 | "no viable alternative at input 'try ... while ...'" | Deluge has no `while` loop; fixed in 1.0.4 - make sure you are pasting the current file |
@@ -200,6 +211,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.5
+- **Version**: 1.0.6
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

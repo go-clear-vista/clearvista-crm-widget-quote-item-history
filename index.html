@@ -1036,6 +1036,7 @@ function safeJsonParse(value){
 // than surfacing bare API text like "invalid data".
 var FUNCTION_ERROR_HELP = {
   "INVALID_DATA":   'The "' + FUNCTION_NAME + '" function was not found in CRM. Create it as a standalone Deluge function from functions/' + FUNCTION_NAME + '.dg in the widget repository, then reopen this widget.',
+  "NOT_ACTIVE":     'The "' + FUNCTION_NAME + '" function exists but is not exposed to the API. In Setup > Developer Hub > Functions, open it and enable REST API (OAuth), matching the existing "stage_update" function.',
   "NOT_FOUND":      'The "' + FUNCTION_NAME + '" function was not found in CRM. Check that the function name matches exactly.',
   "NO_PERMISSION":  'Your profile is not allowed to run the "' + FUNCTION_NAME + '" function. Ask an administrator to grant access.',
   "INTERNAL_ERROR": 'The "' + FUNCTION_NAME + '" function failed while running. Check its execution log under Setup > Developer Hub > Functions.'

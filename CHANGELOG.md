@@ -2,6 +2,20 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.6] - 2026-09-08
+
+### Added
+- The widget explains `NOT_ACTIVE`, which CRM returns when the function exists
+  but has REST API switched off, rather than falling through to a generic
+  message. Comparing the function against the working `stage_update` shows the
+  difference as `rest_api_mode: ["None"]` versus `["Oauth","ZAPI"]`.
+
+### Documentation
+- Setup covers enabling REST API on the function, and records that Zoho
+  registers the argument as `quoteid` with the underscore stripped - the widget
+  sends `quote_id` and CRM normalises them, as the Receive PO widget already
+  relies on.
+
 ## [1.0.5] - 2026-09-08
 
 ### Fixed
