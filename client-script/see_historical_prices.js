@@ -3,102 +3,102 @@
 // Trigger: Custom Button "See Historical Prices"
 //
 // WHY THIS EXISTS
-// A custom button with action "widget" renders the page in Zoho's own fixed
-// modal (roughly 880px wide), and the SDK resize calls do not widen it.
-// Opening the same registered widget from a Client Script lets openPopup set
-// the dimensions, which is how the Distributor Search button gets a larger box.
+// A widget-action button renders in Zoho's fixed ~880px modal and the SDK
+// resize calls do not widen it. Opening the registered widget from a Client
+// Script lets openPopup set the dimensions - the Distributor Search approach.
 //
 // api_name must be the WIDGET's API name from Setup > Developer Space >
-// Widgets ("See_Historical_Sale_Price"), not the button's. It must be the
-// registered widget rather than a bare URL: a URL popup has no Embedded App
-// SDK, so no ZOHO.CRM.API or ZOHO.CRM.FUNCTIONS.
+// Widgets ("See_Historical_Sale_Price"), not the button's, and it must be the
+// registered widget rather than a bare URL, or the page loses the Embedded App
+// SDK and with it ZOHO.CRM.API and ZOHO.CRM.FUNCTIONS.
 //
-// IDENTIFYING THE QUOTE
-// A widget opened by openPopup does not receive PageLoad's EntityId, so the
-// quote has to be named in the data payload. On the EDIT layout - where this
-// button lives - ZDK.Page.getRecord() exposes the form's field values but no
-// record id, so the id cascade below usually comes back empty. The quote
-// NUMBER is on the form either way, and the widget resolves it to a record id
-// itself, so that is the reliable identifier here.
+// IDENTIFYING THE QUOTE - what was established by testing
+//   * openPopup does NOT pass PageLoad's EntityId. The widget receives only
+//     the data payload below, so the quote must be named in it.
+//   * On this button's EDIT layout, ZDK.Page.getRecord() returns nothing -
+//     it yielded no field values and no id.
+//   * ZDK.Page.getSubform("Quoted_Items") DOES work on this layout; the
+//     Distributor Search script writes rows through it.
+// So the quote is identified from its subform rows: Parent_Id when the row
+// exposes it, and the product ids either way, which is what the history is
+// actually built from.
 
 console.log("CS: See Historical Sale Price - opening Item History popup");
 
-function getFormValues() {
+var LONG_ID = /^\d{8,}$/;
+
+function readSubformRows() {
+  var rows = [];
+  var subform;
   try {
-    var record = ZDK.Page.getRecord();
-    if (record && record.getValues) return record.getValues();
+    subform = ZDK.Page.getSubform("Quoted_Items");
   } catch (err) {
-    console.log("CS: getRecord().getValues() threw " + err);
+    console.log("CS: getSubform('Quoted_Items') threw " + err);
+    return rows;
   }
-  return null;
-}
-
-function getFieldValue(apiName) {
-  try {
-    var field = ZDK.Page.getField ? ZDK.Page.getField(apiName) : null;
-    if (field && field.getValue) return field.getValue();
-  } catch (err) {
-    console.log("CS: getField('" + apiName + "') threw " + err);
+  if (!subform) {
+    console.log("CS: getSubform('Quoted_Items') returned nothing");
+    return rows;
   }
-  return null;
-}
 
-// Works on the detail layout; usually empty on the edit layout.
-function resolveQuoteId(values) {
-  var attempts = [
-    ["values.id", function () { return values ? values.id : null; }],
-    ["ZDK.Page.getRecord().get('id')", function () {
-      var r = ZDK.Page.getRecord();
-      return r && r.get ? r.get("id") : null;
-    }],
-    ["ZDK.Page.getRecord().id", function () {
-      var r = ZDK.Page.getRecord();
-      return r ? r.id : null;
-    }],
-    ["ZDK.Page.getRecordId()", function () {
-      return ZDK.Page.getRecordId ? ZDK.Page.getRecordId() : null;
-    }],
-    ["getField('id')", function () { return getFieldValue("id"); }],
-  ];
-
-  for (var i = 0; i < attempts.length; i++) {
+  for (var i = 0; i < 100; i++) {
+    var values;
     try {
-      var value = attempts[i][1]();
-      console.log("CS: " + attempts[i][0] + " -> " + JSON.stringify(value));
-      if (value && /^\d{8,}$/.test(String(value))) return String(value);
+      var row = subform.getRow(i);
+      if (!row) break;
+      values = row.getValues ? row.getValues() : null;
     } catch (err) {
-      console.log("CS: " + attempts[i][0] + " threw " + err);
+      break;
+    }
+    if (!values) break;
+    rows.push(values);
+  }
+  console.log("CS: read " + rows.length + " subform row(s)");
+  if (rows.length > 0) {
+    console.log("CS: row 0 keys: " + Object.keys(rows[0]).join(","));
+    console.log("CS: row 0 values: " + JSON.stringify(rows[0]));
+  }
+  return rows;
+}
+
+// The quote's own id, if any row carries a reference back to the parent.
+function findParentId(rows) {
+  var keys = ["Parent_Id", "parent_id", "Parent_ID"];
+  for (var i = 0; i < rows.length; i++) {
+    for (var k = 0; k < keys.length; k++) {
+      var value = rows[i][keys[k]];
+      if (!value) continue;
+      var candidate = value && value.id ? value.id : value;
+      if (LONG_ID.test(String(candidate))) return String(candidate);
     }
   }
   return "";
 }
 
-function resolveQuoteNumber(values) {
-  var candidates = [
-    values ? values.CRM_Quote_Number : null,
-    values ? values.Quote_Number : null,
-    getFieldValue("CRM_Quote_Number"),
-    getFieldValue("Quote_Number"),
-  ];
-  for (var i = 0; i < candidates.length; i++) {
-    if (candidates[i]) return String(candidates[i]).trim();
+// The products the history is built from - id is the CRM product record id.
+function collectProducts(rows) {
+  var products = [];
+  var seen = {};
+  for (var i = 0; i < rows.length; i++) {
+    var product = rows[i].Product_Name;
+    if (!product || !product.id) continue;
+    var id = String(product.id);
+    if (seen[id]) continue;
+    seen[id] = true;
+    products.push({ id: id, name: product.name ? String(product.name) : "" });
   }
-  return "";
+  console.log("CS: collected " + products.length + " product(s): " + JSON.stringify(products));
+  return products;
 }
 
 try {
-  var values = getFormValues();
-  var formKeys = values ? Object.keys(values).join(",") : "";
-  console.log("CS: form field keys: " + formKeys);
+  var rows = readSubformRows();
+  var products = collectProducts(rows);
+  var quoteId = findParentId(rows);
+  var rowKeys = rows.length > 0 ? Object.keys(rows[0]).join(",") : "";
 
-  var quoteId = resolveQuoteId(values);
-  var quoteNumber = resolveQuoteNumber(values);
-  console.log("CS: quote id '" + quoteId + "', quote number '" + quoteNumber + "'");
+  console.log("CS: quote id '" + quoteId + "', products " + products.length);
 
-  // Open regardless of what could be read here. The widget accepts EntityId
-  // from PageLoad as well as these values, and when it can identify nothing it
-  // displays the payload it received - which is the only way to see what a
-  // popup-launched widget is actually given. Blocking here would hide that.
   ZDK.Client.openPopup(
     {
       api_name: "See_Historical_Sale_Price",
@@ -115,17 +115,16 @@ try {
       data: {
         action: "item_history",
         quote_id: quoteId,
-        quote_number: quoteNumber,
-        // Diagnostic: what the form exposed, echoed by the widget if it still
-        // cannot identify the quote, so the console is not required.
-        form_keys: formKeys,
+        products: products,
+        // Diagnostics, echoed by the widget if it still cannot proceed.
+        row_count: rows.length,
+        row_keys: rowKeys,
       },
       wait: true,
     },
   );
   console.log("CS: Item History popup closed");
 } catch (err) {
-  // Closing the popup with the X rejects with widget_closed - not an error.
   if (err && err.toString().indexOf("widget_closed") !== -1) {
     console.log("CS: Item History closed by user");
   } else {

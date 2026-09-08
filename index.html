@@ -646,6 +646,7 @@ var COLUMNS = [
 
 var recordId    = null;
 var quoteNumber = null;
+var suppliedProductNames = [];
 var allRows     = [];
 var sortKey     = "date";
 var sortDir     = -1;
@@ -1110,7 +1111,9 @@ function applyPayload(payload){
 
   var itemNames = payload.items && payload.items.length
     ? payload.items.slice()
-    : allRows.map(function(row){ return row.item_name; });
+    : (suppliedProductNames.length
+        ? suppliedProductNames.slice()
+        : allRows.map(function(row){ return row.item_name; }));
 
   var unique = [];
   var seen   = {};
@@ -1193,6 +1196,10 @@ var sdkReady = (typeof ZOHO !== "undefined") && !!(ZOHO.embeddedApp);
 // accept both, plus ?id= on the URL as a last resort.
 var ID_KEYS = ["EntityId","entity_id","quote_id","record_id","recordId","id"];
 
+// Subtrees that hold ids of their own, which must not be mistaken for the
+// quote's - a product id under products[] is not a record id for Quotes.
+var NON_QUOTE_KEYS = { products: true, line_items: true, items: true, rows: true };
+
 // Walk the PageLoad payload for anything that looks like a record id. A
 // widget-action button supplies EntityId at the top level; an openPopup
 // payload nests it, and the nesting depth varies by ZDK version, so search
@@ -1222,9 +1229,37 @@ function findRecordId(node, depth){
 
   for(var key in node){
     if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    if(NON_QUOTE_KEYS[key]) continue;
     var nested = node[key];
     if(nested && typeof nested === "object"){
       var found = findRecordId(nested, depth + 1);
+      if(found) return found;
+    }
+  }
+  return null;
+}
+
+function findProducts(node, depth){
+  if(node === null || node === undefined || depth > 4) return null;
+
+  if(Array.isArray(node)){
+    var looksLikeProducts = node.length > 0 && node[0] && typeof node[0] === "object" && node[0].id;
+    if(looksLikeProducts) return node;
+    for(var i = 0; i < node.length; i++){
+      var fromItem = findProducts(node[i], depth + 1);
+      if(fromItem) return fromItem;
+    }
+    return null;
+  }
+
+  if(typeof node !== "object") return null;
+
+  if(Array.isArray(node.products) && node.products.length) return node.products;
+
+  for(var key in node){
+    if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    if(node[key] && typeof node[key] === "object"){
+      var found = findProducts(node[key], depth + 1);
       if(found) return found;
     }
   }
@@ -1307,31 +1342,40 @@ async function onPageLoad(data){
 
   try {
     if(!recordId){
-      // The edit layout gives the Client Script a quote number but no id.
       var number = findQuoteNumber(data, 0);
       if(number){
         setStatus("Looking up quote " + number + "...", "loading");
         recordId = await recordIdFromQuoteNumber(number);
-        if(!recordId){
-          throw new Error("Quote " + number + " could not be found in CRM, so its item history cannot be loaded.");
-        }
       }
     }
 
-    if(!recordId){
+    // The edit layout exposes the Quoted_Items subform but not the quote, so
+    // the Client Script can send the products even with no quote id.
+    var products = findProducts(data, 0);
+    var productIds = (products || []).map(function(p){ return String(p.id); })
+                                     .filter(function(id){ return /^\d{6,}$/.test(id); });
+    suppliedProductNames = (products || []).map(function(p){ return p.name ? String(p.name) : ""; })
+                                           .filter(function(name){ return !!name; });
+
+    if(!recordId && !productIds.length){
       var seen = "";
       try { seen = JSON.stringify(data); } catch(ignored){ seen = String(data); }
       if(seen && seen.length > 900) seen = seen.slice(0,900) + "...";
       throw new Error("This quote could not be identified. Send this whole message on so the payload can be read. PageLoad delivered: " + seen);
     }
 
-    var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });
-    var record   = response && response.data && response.data[0] ? response.data[0] : null;
-    if(!record) throw new Error("Quote record not found.");
+    if(recordId){
+      var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });
+      var record   = response && response.data && response.data[0] ? response.data[0] : null;
+      if(record){
+        setReference(record.CRM_Quote_Number || record.Quote_Number || record.Quote_No || record.Subject || recordId);
+      }
+    }
 
-    setReference(record.CRM_Quote_Number || record.Quote_Number || record.Quote_No || record.Subject || recordId);
-
-    var payload = await executeFunction(FUNCTION_NAME, { quote_id: String(recordId) });
+    var payload = await executeFunction(FUNCTION_NAME, {
+      quote_id:    recordId ? String(recordId) : "",
+      product_ids: productIds.join(",")
+    });
 
     if(!payload || typeof payload !== "object"){
       throw new Error("The " + FUNCTION_NAME + " function returned no data.");

@@ -2,6 +2,31 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.4.0] - 2026-09-08
+
+### Added
+- The backend takes a second argument: `quote_item_history(quote_id,
+  product_ids)`. `product_ids` is a comma-separated list of CRM product record
+  ids, for callers that can read the quote's subform but not the quote record.
+  Passing `quote_id` alone behaves exactly as before, so this is backward
+  compatible. SKUs and the item list are then derived from the history rows,
+  which the Books lookup needs.
+- The Client Script reads the `Quoted_Items` subform - the one page API that
+  works on the edit layout - taking `Parent_Id` when a row exposes it and the
+  product ids either way, and logs the row keys so the row shape is visible.
+
+### Fixed
+- The widget was passing a **product** id as `quote_id`. Its payload search
+  accepted any key named `id` at any depth, including inside `products`, so a
+  products-only payload sent the first product's id as the quote. The search
+  no longer descends into `products`, `items`, `rows` or `line_items`.
+
+### Documentation
+- Recorded what testing established on the edit layout: `openPopup` does not
+  deliver `EntityId`, `ZDK.Page.getRecord()` returns nothing at all, and
+  `ZDK.Page.getSubform()` works - so the subform is the only source of context
+  there.
+
 ## [1.3.2] - 2026-09-08
 
 ### Changed

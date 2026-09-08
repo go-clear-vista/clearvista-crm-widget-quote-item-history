@@ -62,28 +62,29 @@ have no way to read the quote or call its backend. The `api_name` in the script
 must therefore be the **widget's** API name from Setup → Developer Space →
 Widgets, not the button's.
 
-**A widget opened by `openPopup` does not receive `EntityId`** - that only
-arrives for a widget-action button - so the Client Script has to name the quote
-in the `data` payload. Two identifiers are passed, because which one is
-available depends on the layout the button sits on:
+What testing established on this org's edit layout, where the button lives
+(`position: create_clone`):
 
-| Layout | Record id | Quote number |
-| --- | --- | --- |
-| Detail view | available | available |
-| **Edit / create** (where this button lives, `position: create_clone`) | **not exposed** - `ZDK.Page.getRecord()` gives field values without an id | available |
+| | Result |
+| --- | --- |
+| `PageLoad` `EntityId` via `openPopup` | **not delivered** - the widget receives only the `data` payload plus `wait` |
+| `ZDK.Page.getRecord()` | **returns nothing** - no field values, no id, no quote number |
+| `ZDK.Page.getSubform("Quoted_Items")` | **works** - the Distributor Search script writes rows through it |
 
-So the quote **number** is the reliable identifier here. The widget resolves it
-to a record id with `ZOHO.CRM.API.searchRecord` before calling the backend,
-which keeps the Deluge function's contract a plain record id.
+So on this layout the subform is the only source of context. The Client Script
+reads its rows and passes `Parent_Id` when a row exposes it, plus the product
+ids either way - and the products are what the history is actually built from.
 
-The payload is searched rather than assumed: any of `EntityId`, `entity_id`,
-`quote_id`, `record_id`, `recordId` or `id` holding a long numeric value is
-accepted at any nesting depth, as are `quote_number`, `CRM_Quote_Number`,
-`Quote_Number` and `quoteNumber`, plus `?id=` on the URL. If nothing is found
-the on-screen error quotes the payload CRM actually sent.
+The backend therefore accepts **either** identifier:
+`quote_item_history(quote_id, product_ids)`. `quote_id` derives the items
+itself; `product_ids` is a comma-separated list of CRM product record ids, for
+callers that can read the subform but not the quote. Passing `quote_id` alone
+behaves exactly as before.
 
-An unsaved quote has no number yet, so the script says to save it first rather
-than opening a widget that cannot load.
+The widget searches the payload rather than assuming a shape, and deliberately
+does **not** descend into `products`, `items`, `rows` or `line_items` when
+hunting for the record id - a product's own id there is not a Quotes record id.
+If nothing usable is found, the on-screen error quotes the payload CRM sent.
 
 ### Table layout
 
@@ -285,6 +286,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.3.2
+- **Version**: 1.4.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books
