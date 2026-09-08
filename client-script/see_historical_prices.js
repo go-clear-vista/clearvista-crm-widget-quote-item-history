@@ -12,10 +12,16 @@
 // Set the button's action to this Client Script instead of the widget.
 //
 // IMPORTANT: api_name below must be the WIDGET's API name from
-// Setup > Developer Space > Widgets - not the button's. Opening a bare URL
-// instead of the registered widget would lose the Embedded App SDK, and with
-// it ZOHO.CRM.API and ZOHO.CRM.FUNCTIONS, so the widget could not read the
-// quote or call quote_item_history.
+// Setup > Developer Space > Widgets - not the button's. If the popup opens
+// empty or errors, that value is the first thing to check.
+//
+// It must be the registered widget rather than a bare URL: a URL popup has no
+// Embedded App SDK, so no ZOHO.CRM.API or ZOHO.CRM.FUNCTIONS, and the widget
+// could neither read the quote nor call quote_item_history.
+//
+// Sizing: 1450x860 fits all nine columns with room to spare. The widget also
+// caps its card at 1560px, so a wider popup stays readable rather than
+// stretching the table.
 
 console.log("CS: See Historical Sale Price - opening Item History popup");
 

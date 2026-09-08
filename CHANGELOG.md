@@ -2,6 +2,14 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.2.1] - 2026-09-08
+
+### Changed
+- Sized for the Client Script popup, now the intended way to open this widget:
+  the card fills up to 1560px (was 1320px) and the table takes up to 64vh/640px
+  of the taller window. Verified at 1450x860 - the card fills 1426px with no
+  horizontal scrolling - and still clean in the 880px widget modal.
+
 ## [1.2.0] - 2026-09-08
 
 ### Removed

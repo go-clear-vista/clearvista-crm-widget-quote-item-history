@@ -46,11 +46,15 @@ choose the popup size:
 | `widget` | Zoho renders the page in its own fixed modal (roughly 880px wide). `ZOHO.CRM.UI.Resize()` and `ZOHO.CRM.UI.Popup.resize()` are called on load but a widget-action modal may ignore both. |
 | `cscript` | A Client Script opens the popup and passes explicit `height`/`width`, so the size is yours to set. |
 
-The nine columns need about 820px, so the table fits the fixed modal. For a
-larger box, point the button at `client-script/see_historical_prices.js`
-instead, which opens the same registered widget through
-`ZDK.Client.openPopup()` with explicit dimensions - the approach the org's
-`Distributor_Search` button uses.
+This org drives the button from `client-script/see_historical_prices.js`, which
+opens the registered widget through `ZDK.Client.openPopup()` at **1450 x 860** -
+the approach the `Distributor_Search` button uses. The card fills the popup up
+to a 1560px cap. The nine columns also fit the fixed ~880px widget modal (they
+need 820px), so the widget works under either button shape.
+
+To switch the button over: Setup → Customization → Modules and Fields → Quotes →
+Links and Buttons → **See Historical Prices**, change the action from Widget to
+Client Script, and paste in `client-script/see_historical_prices.js`.
 
 Opening a bare URL instead of the registered widget loses the Embedded App SDK
 context, and with it `ZOHO.CRM.API` and `ZOHO.CRM.FUNCTIONS` - the widget would
@@ -262,6 +266,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.2.1
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books
