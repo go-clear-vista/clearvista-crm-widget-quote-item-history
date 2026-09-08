@@ -36,6 +36,15 @@ Built to match the look and feel of the other ClearVista CRM widgets
 | Discount | Line discount amount, with the effective percentage beneath |
 | Price After Discount | **Per-unit** price after discount |
 
+### Table layout
+
+The table uses `table-layout: fixed` with percentage column widths, so the ten
+columns always divide the popup exactly and text wraps inside its column rather
+than widening the table. Below a 1000px `min-width` floor the table scrolls
+horizontally instead of crushing. Cells carry `.c-num` for right alignment; note
+that header cells must override the `white-space: nowrap` that class brings,
+otherwise "Price After Discount" cannot wrap and pushes past the table edge.
+
 ### Deluge notes
 
 Deluge is not JavaScript, and two limits shape this function:
@@ -167,8 +176,9 @@ Then set the two configuration constants at the top of `quote_item_history`:
 - Create a button named **Item History**
 - **Action**: Widget → the Pages URL above
 - **Placement**: View Layout (quote detail page)
-- Recommended popup size: **1350 × 720** so all ten columns are visible without
-  horizontal scrolling (the table scrolls horizontally in narrower popups)
+- Popup size: the widget calls `ZOHO.CRM.UI.Popup.resize()` on load to widen
+  itself to fit the screen, so the size set here matters less; **1350 × 720** is
+  a good starting value for clients where resize is unavailable
 - Assign the profiles and Quote layouts that should see the button
 
 ## API requirements
@@ -227,6 +237,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.8
+- **Version**: 1.1.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

@@ -2,6 +2,25 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.1.0] - 2026-09-08
+
+### Added
+- The widget widens its own popup on load via `ZOHO.CRM.UI.Popup.resize()`,
+  sized from the screen (1120-1560px wide), so the ten columns fit without the
+  CRM button configuration having to be generous. Failure is silent.
+
+### Changed
+- The table uses `table-layout: fixed` with percentage column widths, so the
+  columns divide the popup exactly and text wraps in place instead of widening
+  the table. Trimmed the page, cell and header padding, and gave the table more
+  vertical room now that the popup is larger.
+
+### Fixed
+- All ten columns are visible without horizontal scrolling. Header cells carry
+  `.c-num` for alignment, which also brought `white-space: nowrap` with it, so
+  "Price After Discount" could not wrap and its sort arrow overflowed the table
+  by 142px - forcing a horizontal scrollbar however wide the popup was.
+
 ## [1.0.8] - 2026-09-08
 
 ### Fixed
