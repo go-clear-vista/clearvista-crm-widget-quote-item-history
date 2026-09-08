@@ -2,6 +2,20 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.5] - 2026-09-08
+
+### Fixed
+- The backend would not compile: `connection:` on an `invokeurl` was given the
+  `CRM_CONNECTION` String variable, and Deluge requires a literal, rejecting it
+  with "The 'connections' value of the 'invokeUrl' task is of type 'STRING'
+  which does not match the required data type 'CONNECTION LINKNAME'". The
+  connection link name is now a quoted literal in both `invokeurl` blocks and
+  the unused variable is gone.
+
+### Changed
+- `BOOKS_ORG_ID` ships with this org's Books organization ID rather than blank,
+  so the pasted function needs no edits to return Books data.
+
 ## [1.0.4] - 2026-09-08
 
 ### Fixed

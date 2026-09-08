@@ -10,13 +10,14 @@ string automation.quote_item_history(String quote_id)
 	// total_after_discount / quantity, because the stored item price is
 	// sometimes a pre-discount list price (see CLAUDE.md).
 	//
-	// CRM_CONNECTION - connection with scope ZohoCRM.coql.READ, used to query
-	//                  the Quoted_Items subform module across all quotes.
-	// BOOKS_ORG_ID   - Zoho Books organization ID. Leave blank to run against
+	// COQL connection: "crm_api_v21" - needs scope ZohoCRM.coql.READ, and is
+	//   used to query the Quoted_Items subform module across all quotes. Deluge
+	//   requires a LITERAL connection link name on an invokeurl, so if the
+	//   connection is renamed, update both invokeurl blocks below by hand.
+	// BOOKS_ORG_ID   - Zoho Books organization ID. Set it to "" to run against
 	//                  CRM sales quotes only; the widget says so in a banner.
 	// Neither failure is fatal - the widget renders whatever it could load.
-	CRM_CONNECTION = "zoho_crm_conn";
-	BOOKS_ORG_ID = "";
+	BOOKS_ORG_ID = "787402164";
 	MAX_DOCS_PER_TYPE = 60;
 
 	result = Map();
@@ -128,7 +129,7 @@ string automation.quote_item_history(String quote_id)
 					url :"https://www.zohoapis.com/crm/v7/coql"
 					type :POST
 					parameters:body.toString()
-					connection:CRM_CONNECTION
+					connection:"crm_api_v21"
 				];
 				for each line in ifnull(response.get("data"),List())
 				{
@@ -154,7 +155,7 @@ string automation.quote_item_history(String quote_id)
 		}
 		catch (e)
 		{
-			warnings.add("Sales quote history could not be loaded (COQL connection '" + CRM_CONNECTION + "'): " + e.toString());
+			warnings.add("Sales quote history could not be loaded - check the crm_api_v21 connection: " + e.toString());
 		}
 
 		// ---- 3b. parent quote headers, in batches of 100 ----------------
@@ -189,7 +190,7 @@ string automation.quote_item_history(String quote_id)
 							url :"https://www.zohoapis.com/crm/v7/coql"
 							type :POST
 							parameters:headerBody.toString()
-							connection:CRM_CONNECTION
+							connection:"crm_api_v21"
 						];
 						for each record in ifnull(headerResp.get("data"),List())
 						{

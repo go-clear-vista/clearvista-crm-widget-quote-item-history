@@ -42,6 +42,10 @@ Deluge is not JavaScript, and two limits shape this function:
 
 - **No `while` loop.** The COQL paging walks a fixed `pageOffsets` list instead,
   capping the CRM quote history at 10 pages x 200 rows = 2000 line items.
+- **`connection:` on an `invokeurl` must be a literal**, not a variable - Deluge
+  rejects a String with *"does not match the required data type 'CONNECTION
+  LINKNAME'"*. The connection link name is therefore hard-coded in both
+  `invokeurl` blocks; rename the connection and you must edit both by hand.
 - **One function per definition, signature on line 1.** Everything is inlined
   into the single function rather than split into helpers.
 
@@ -128,10 +132,10 @@ for a function created this way, `standalone` for older ones such as
 
 Then set the two configuration constants at the top of `quote_item_history`:
 
-| Constant | Purpose |
-| --- | --- |
-| `CRM_CONNECTION` | Name of a CRM connection with the `ZohoCRM.coql.READ` scope (Setup → Developer Hub → Connections). Required for the sales quote history. |
-| `BOOKS_ORG_ID` | Your Zoho Books organization ID. Leave blank to launch with CRM quotes only; the widget will say so in its banner. |
+| Setting | Where | Purpose |
+| --- | --- | --- |
+| Connection link name | the `connection:` line of both `invokeurl` blocks | A CRM connection with the `ZohoCRM.coql.READ` scope (Setup → Developer Hub → Connections). Required for the sales quote history, and must be a literal. |
+| `BOOKS_ORG_ID` | near the top of the function | Zoho Books organization ID. Set it to `""` to launch with CRM quotes only; the widget will say so in its banner. |
 
 ### 3. Create the button
 
@@ -175,10 +179,11 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | "The quote_item_history function was not found in CRM" | The Deluge function has not been created yet - see step 2. This is what CRM's raw `INVALID_DATA` response means. |
 | "Improper code format" when saving the function | The signature must be the first line and only one function may be defined |
 | "no viable alternative at input 'string ...'" (Line 1 or 3) | The category word on line 1 does not match the function's configured Category |
-| "no viable alternative at input 'try ... while ...'" | Deluge has no `while` loop; this was fixed in 1.0.4 - make sure you are pasting the current file |
+| "no viable alternative at input 'try ... while ...'" | Deluge has no `while` loop; fixed in 1.0.4 - make sure you are pasting the current file |
+| "'connections' value ... does not match ... 'CONNECTION LINKNAME'" | `connection:` was given a variable; it must be a quoted literal - fixed in 1.0.5 |
 | "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
-| Banner: "Sales quote history could not be loaded" | `CRM_CONNECTION` is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
-| Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is still blank in the function |
+| Banner: "Sales quote history could not be loaded" | The connection named in the `invokeurl` blocks is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
+| Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is empty in the function |
 | Table shows quotes but no orders/invoices | The CRM SKU has no matching Books item, or the Books item has no documents in the selected timeframe |
 | "No item history found" | None of this quote's products appear on any other document yet |
 | Widget shows sample data inside CRM | The Embedded App SDK could not load - check that `live.zwidgets.com` is reachable |
@@ -195,6 +200,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.4
+- **Version**: 1.0.5
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books
