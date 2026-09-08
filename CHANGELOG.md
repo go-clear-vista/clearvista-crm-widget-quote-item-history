@@ -2,6 +2,22 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.4] - 2026-09-08
+
+### Fixed
+- The backend would not compile: Deluge has no `while` loop, so the editor
+  rejected the COQL paging block with "no viable alternative at input
+  'try ... while ...'". Paging now walks a fixed `pageOffsets` list and stops
+  early once `more_records` is false, which caps the CRM quote history at
+  10 pages x 200 rows = 2000 line items. `MAX_HISTORY_PAGES` is gone.
+
+### Documentation
+- Added a "Deluge notes" section recording the language limits that shape this
+  function, so they are not rediscovered the hard way.
+- Corrected the troubleshooting entry for "no viable alternative at input
+  'string ...'": that error is a category mismatch on line 1, not a `void`
+  return type.
+
 ## [1.0.3] - 2026-09-08
 
 ### Changed

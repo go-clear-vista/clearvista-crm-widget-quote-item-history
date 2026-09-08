@@ -36,6 +36,15 @@ Built to match the look and feel of the other ClearVista CRM widgets
 | Discount | Line discount amount, with the effective percentage beneath |
 | Price After Discount | **Per-unit** price after discount |
 
+### Deluge notes
+
+Deluge is not JavaScript, and two limits shape this function:
+
+- **No `while` loop.** The COQL paging walks a fixed `pageOffsets` list instead,
+  capping the CRM quote history at 10 pages x 200 rows = 2000 line items.
+- **One function per definition, signature on line 1.** Everything is inlined
+  into the single function rather than split into helpers.
+
 ### Pricing convention
 
 `Item Price` and `Price After Discount` are both **per unit**, so prices are directly
@@ -96,10 +105,8 @@ settings:
 | Return Type | **String** - not the default `void` |
 | Argument | `quote_id`, type **String** |
 
-The Return Type is the one that bites: if it is left as `void`, the editor
-rejects line 1 with *"no viable alternative at input 'string ...'"*, because it
-validates the declared return type against this setting. Change it with the
-pencil icon next to the function name.
+Set Return Type with the pencil icon next to the function name. The widget
+reads the function's output, so a `void` function returns it nothing.
 
 Then replace the editor's contents with **all** of `functions/quote_item_history.dg`
 and save. The file is one single function whose signature is its first line,
@@ -167,7 +174,8 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | --- | --- |
 | "The quote_item_history function was not found in CRM" | The Deluge function has not been created yet - see step 2. This is what CRM's raw `INVALID_DATA` response means. |
 | "Improper code format" when saving the function | The signature must be the first line and only one function may be defined |
-| "no viable alternative at input 'string ...'" | Return Type is still `void` - set it to String in the function settings |
+| "no viable alternative at input 'string ...'" (Line 1 or 3) | The category word on line 1 does not match the function's configured Category |
+| "no viable alternative at input 'try ... while ...'" | Deluge has no `while` loop; this was fixed in 1.0.4 - make sure you are pasting the current file |
 | "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
 | Banner: "Sales quote history could not be loaded" | `CRM_CONNECTION` is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
 | Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is still blank in the function |
@@ -187,6 +195,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.3
+- **Version**: 1.0.4
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

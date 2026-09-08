@@ -18,7 +18,6 @@ string automation.quote_item_history(String quote_id)
 	CRM_CONNECTION = "zoho_crm_conn";
 	BOOKS_ORG_ID = "";
 	MAX_DOCS_PER_TYPE = 60;
-	MAX_HISTORY_PAGES = 10;
 
 	result = Map();
 	rows = List();
@@ -98,14 +97,30 @@ string automation.quote_item_history(String quote_id)
 		parentIds = List();
 		crmLoaded = false;
 
+		// Deluge has no while loop, so page through a fixed list of offsets.
+		// 10 pages x 200 rows caps this at 2000 quote line items.
+		pageOffsets = List();
+		pageOffsets.add(0);
+		pageOffsets.add(200);
+		pageOffsets.add(400);
+		pageOffsets.add(600);
+		pageOffsets.add(800);
+		pageOffsets.add(1000);
+		pageOffsets.add(1200);
+		pageOffsets.add(1400);
+		pageOffsets.add(1600);
+		pageOffsets.add(1800);
+
 		try
 		{
-			offset = 0;
 			morePages = true;
-			pageCount = 0;
-			while(morePages && pageCount < MAX_HISTORY_PAGES)
+			for each pageOffset in pageOffsets
 			{
-				coql = "select Parent_Id, Product_Name, Description, Item_Notes, Quantity, List_Price, Discount, Total, Total_After_Discount from Quoted_Items where Product_Name in (" + idClause + ") limit " + offset + ", 200";
+				if(!morePages)
+				{
+					continue;
+				}
+				coql = "select Parent_Id, Product_Name, Description, Item_Notes, Quantity, List_Price, Discount, Total, Total_After_Discount from Quoted_Items where Product_Name in (" + idClause + ") limit " + pageOffset + ", 200";
 				body = Map();
 				body.put("select_query",coql);
 				response = invokeurl
@@ -133,9 +148,7 @@ string automation.quote_item_history(String quote_id)
 				if(info != null && ifnull(info.get("more_records"),false) == true)
 				{
 					morePages = true;
-					offset = offset + 200;
 				}
-				pageCount = pageCount + 1;
 			}
 			crmLoaded = true;
 		}
