@@ -63,17 +63,27 @@ must therefore be the **widget's** API name from Setup → Developer Space →
 Widgets, not the button's.
 
 **A widget opened by `openPopup` does not receive `EntityId`** - that only
-arrives for a widget-action button. The Client Script must therefore read the
-record id from the page and pass it in the `data` payload. ZDK exposes the id
-differently across versions, so the script tries each known form
-(`getRecord().get('id')`, `getRecord().getValues().id`, `getRecord().id`,
-`getField('id').getValue()`, `getRecordId()`) and logs which one worked.
+arrives for a widget-action button - so the Client Script has to name the quote
+in the `data` payload. Two identifiers are passed, because which one is
+available depends on the layout the button sits on:
 
-On the widget side the payload is searched rather than assumed: any of
-`EntityId`, `entity_id`, `quote_id`, `record_id`, `recordId` or `id` holding a
-long numeric value is accepted, at any nesting depth, plus `?id=` on the URL.
-If nothing is found the on-screen error quotes the payload CRM actually sent,
-so the shape can be diagnosed without the console.
+| Layout | Record id | Quote number |
+| --- | --- | --- |
+| Detail view | available | available |
+| **Edit / create** (where this button lives, `position: create_clone`) | **not exposed** - `ZDK.Page.getRecord()` gives field values without an id | available |
+
+So the quote **number** is the reliable identifier here. The widget resolves it
+to a record id with `ZOHO.CRM.API.searchRecord` before calling the backend,
+which keeps the Deluge function's contract a plain record id.
+
+The payload is searched rather than assumed: any of `EntityId`, `entity_id`,
+`quote_id`, `record_id`, `recordId` or `id` holding a long numeric value is
+accepted at any nesting depth, as are `quote_number`, `CRM_Quote_Number`,
+`Quote_Number` and `quoteNumber`, plus `?id=` on the URL. If nothing is found
+the on-screen error quotes the payload CRM actually sent.
+
+An unsaved quote has no number yet, so the script says to save it first rather
+than opening a widget that cannot load.
 
 ### Table layout
 
@@ -275,6 +285,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.3.0
+- **Version**: 1.3.1
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

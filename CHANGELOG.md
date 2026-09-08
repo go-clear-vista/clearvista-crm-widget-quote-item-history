@@ -2,6 +2,20 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.3.1] - 2026-09-08
+
+### Fixed
+- The Client Script could not identify the quote. The button sits on the
+  **edit** layout, where `ZDK.Page.getRecord()` exposes the form's field values
+  but no record id, so every id form came back empty.
+  - The script now also reads the quote **number** from the form, which is
+    present on both the edit and detail layouts, and passes both identifiers.
+  - The widget resolves a quote number to a record id with
+    `ZOHO.CRM.API.searchRecord` before calling the backend, so the Deluge
+    function's contract stays a plain record id and needs no change.
+  - Verified across four cases: id present, number only, number not found, and
+    an unsaved quote with neither.
+
 ## [1.3.0] - 2026-09-08
 
 ### Fixed

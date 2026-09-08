@@ -1235,6 +1235,64 @@ function resolveRecordId(data){
   return match ? match[1] : null;
 }
 
+// Find a quote number anywhere in the payload. The edit layout exposes the
+// number but not the record id, so this is the identifier the Client Script
+// can usually supply.
+function findQuoteNumber(node, depth){
+  if(node === null || node === undefined || depth > 4) return null;
+
+  if(Array.isArray(node)){
+    for(var i = 0; i < node.length; i++){
+      var fromItem = findQuoteNumber(node[i], depth + 1);
+      if(fromItem) return fromItem;
+    }
+    return null;
+  }
+
+  if(typeof node !== "object") return null;
+
+  var keys = ["quote_number","CRM_Quote_Number","Quote_Number","quoteNumber"];
+  for(var k = 0; k < keys.length; k++){
+    var value = node[keys[k]];
+    if(value !== null && value !== undefined && String(value).trim() !== ""){
+      return String(value).trim();
+    }
+  }
+
+  for(var key in node){
+    if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    if(node[key] && typeof node[key] === "object"){
+      var found = findQuoteNumber(node[key], depth + 1);
+      if(found) return found;
+    }
+  }
+  return null;
+}
+
+// Turn a quote number into a record id, so the backend contract stays a
+// record id regardless of which identifier the button could supply.
+async function recordIdFromQuoteNumber(number){
+  var fields = ["CRM_Quote_Number","Quote_Number"];
+
+  for(var i = 0; i < fields.length; i++){
+    try {
+      var response = await ZOHO.CRM.API.searchRecord({
+        Entity: MODULE_API_NAME,
+        Type: "criteria",
+        Query: "(" + fields[i] + ":equals:" + number + ")"
+      });
+      var match = response && response.data && response.data[0] ? response.data[0] : null;
+      if(match && match.id){
+        console.log("Resolved quote " + number + " to id " + match.id + " via " + fields[i]);
+        return String(match.id);
+      }
+    } catch(error){
+      console.log("searchRecord on " + fields[i] + " failed:", error);
+    }
+  }
+  return null;
+}
+
 async function onPageLoad(data){
   initialised = true;
   console.log("PageLoad data:", data);
@@ -1245,10 +1303,22 @@ async function onPageLoad(data){
 
   try {
     if(!recordId){
+      // The edit layout gives the Client Script a quote number but no id.
+      var number = findQuoteNumber(data, 0);
+      if(number){
+        setStatus("Looking up quote " + number + "...", "loading");
+        recordId = await recordIdFromQuoteNumber(number);
+        if(!recordId){
+          throw new Error("Quote " + number + " could not be found in CRM, so its item history cannot be loaded.");
+        }
+      }
+    }
+
+    if(!recordId){
       var seen = "";
       try { seen = JSON.stringify(data); } catch(ignored){ seen = String(data); }
       if(seen && seen.length > 400) seen = seen.slice(0,400) + "...";
-      throw new Error("No quote record ID was supplied. The Client Script must pass it as data.quote_id in its openPopup call - see client-script/see_historical_prices.js. CRM sent: " + seen);
+      throw new Error("This quote could not be identified. The Client Script must pass data.quote_id or data.quote_number in its openPopup call - see client-script/see_historical_prices.js. CRM sent: " + seen);
     }
 
     var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });

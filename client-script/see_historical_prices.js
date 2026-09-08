@@ -4,55 +4,68 @@
 //
 // WHY THIS EXISTS
 // A custom button with action "widget" renders the page in Zoho's own fixed
-// modal (roughly 880px wide), and neither ZOHO.CRM.UI.Resize() nor
-// ZOHO.CRM.UI.Popup.resize() widens it. Opening the same registered widget
-// from a Client Script lets openPopup set the dimensions, which is how the
-// Distributor Search button gets a larger box.
+// modal (roughly 880px wide), and the SDK resize calls do not widen it.
+// Opening the same registered widget from a Client Script lets openPopup set
+// the dimensions, which is how the Distributor Search button gets a larger box.
 //
 // api_name must be the WIDGET's API name from Setup > Developer Space >
 // Widgets ("See_Historical_Sale_Price"), not the button's. It must be the
 // registered widget rather than a bare URL: a URL popup has no Embedded App
-// SDK, so no ZOHO.CRM.API or ZOHO.CRM.FUNCTIONS, and the widget could neither
-// read the quote nor call quote_item_history.
+// SDK, so no ZOHO.CRM.API or ZOHO.CRM.FUNCTIONS.
 //
-// Sizing: 1450x860 fits all nine columns with room to spare. The widget caps
-// its card at 1560px, so a wider popup stays readable.
+// IDENTIFYING THE QUOTE
+// A widget opened by openPopup does not receive PageLoad's EntityId, so the
+// quote has to be named in the data payload. On the EDIT layout - where this
+// button lives - ZDK.Page.getRecord() exposes the form's field values but no
+// record id, so the id cascade below usually comes back empty. The quote
+// NUMBER is on the form either way, and the widget resolves it to a record id
+// itself, so that is the reliable identifier here.
 
 console.log("CS: See Historical Sale Price - opening Item History popup");
 
-// A widget opened by openPopup does NOT receive the record through PageLoad's
-// EntityId, so the id has to be passed in the data payload. ZDK exposes it
-// differently across versions, so try each known form and log which one won -
-// the widget shows an error naming this file if all of them come back empty.
-function resolveQuoteId() {
+function getFormValues() {
+  try {
+    var record = ZDK.Page.getRecord();
+    if (record && record.getValues) return record.getValues();
+  } catch (err) {
+    console.log("CS: getRecord().getValues() threw " + err);
+  }
+  return null;
+}
+
+function getFieldValue(apiName) {
+  try {
+    var field = ZDK.Page.getField ? ZDK.Page.getField(apiName) : null;
+    if (field && field.getValue) return field.getValue();
+  } catch (err) {
+    console.log("CS: getField('" + apiName + "') threw " + err);
+  }
+  return null;
+}
+
+// Works on the detail layout; usually empty on the edit layout.
+function resolveQuoteId(values) {
   var attempts = [
+    ["values.id", function () { return values ? values.id : null; }],
     ["ZDK.Page.getRecord().get('id')", function () {
       var r = ZDK.Page.getRecord();
       return r && r.get ? r.get("id") : null;
-    }],
-    ["ZDK.Page.getRecord().getValues().id", function () {
-      var r = ZDK.Page.getRecord();
-      var v = r && r.getValues ? r.getValues() : null;
-      return v ? v.id : null;
     }],
     ["ZDK.Page.getRecord().id", function () {
       var r = ZDK.Page.getRecord();
       return r ? r.id : null;
     }],
-    ["ZDK.Page.getField('id').getValue()", function () {
-      var f = ZDK.Page.getField ? ZDK.Page.getField("id") : null;
-      return f && f.getValue ? f.getValue() : null;
-    }],
     ["ZDK.Page.getRecordId()", function () {
       return ZDK.Page.getRecordId ? ZDK.Page.getRecordId() : null;
     }],
+    ["getField('id')", function () { return getFieldValue("id"); }],
   ];
 
   for (var i = 0; i < attempts.length; i++) {
     try {
       var value = attempts[i][1]();
       console.log("CS: " + attempts[i][0] + " -> " + JSON.stringify(value));
-      if (value) return String(value);
+      if (value && /^\d{8,}$/.test(String(value))) return String(value);
     } catch (err) {
       console.log("CS: " + attempts[i][0] + " threw " + err);
     }
@@ -60,13 +73,32 @@ function resolveQuoteId() {
   return "";
 }
 
-try {
-  var quoteId = resolveQuoteId();
-  console.log("CS: quote id resolved as '" + quoteId + "'");
+function resolveQuoteNumber(values) {
+  var candidates = [
+    values ? values.CRM_Quote_Number : null,
+    values ? values.Quote_Number : null,
+    getFieldValue("CRM_Quote_Number"),
+    getFieldValue("Quote_Number"),
+  ];
+  for (var i = 0; i < candidates.length; i++) {
+    if (candidates[i]) return String(candidates[i]).trim();
+  }
+  return "";
+}
 
-  if (!quoteId) {
+try {
+  var values = getFormValues();
+  var formKeys = values ? Object.keys(values).join(",") : "";
+  console.log("CS: form field keys: " + formKeys);
+
+  var quoteId = resolveQuoteId(values);
+  var quoteNumber = resolveQuoteNumber(values);
+  console.log("CS: quote id '" + quoteId + "', quote number '" + quoteNumber + "'");
+
+  if (!quoteId && !quoteNumber) {
+    // Neither identifier is available - an unsaved quote has no number yet.
     ZDK.Client.showMessage(
-      "Could not read this quote's record id, so item history cannot be loaded. Save the quote first, then try again.",
+      "Could not identify this quote, so item history cannot be loaded. If the quote has not been saved yet, save it and try again.",
       "error",
     );
   } else {
@@ -86,8 +118,10 @@ try {
         data: {
           action: "item_history",
           quote_id: quoteId,
-          record_id: quoteId,
-          EntityId: quoteId,
+          quote_number: quoteNumber,
+          // Diagnostic: lets the widget say what the form exposed if it still
+          // cannot identify the quote, without needing the console.
+          form_keys: formKeys,
         },
         wait: true,
       },
