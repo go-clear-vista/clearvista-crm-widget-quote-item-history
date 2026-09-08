@@ -1,10 +1,14 @@
-string automation.quote_item_history(String quote_id, String product_ids)
+string automation.quote_item_history(String quote_id)
 {
 	// Backend for the Item History widget (launched from a sales quote).
-	// Return type String; arguments quote_id (String) and product_ids (String).
-	// Pass either: quote_id derives the items itself, while product_ids is a
-	// comma-separated list of CRM product record ids, for callers that can read
-	// the quote's subform but not the quote record (the edit layout).
+	// Return type String; ONE argument, quote_id (String), carrying either:
+	//   a quote record id       - the line items are derived from the quote
+	//   "products=<id,id,...>"  - CRM product record ids, for callers that can
+	//                             read the quote's subform but not the quote
+	//                             record itself (the edit layout)
+	// One argument, not two, because Zoho saves a function's argument list and
+	// its code together: a new argument will not register until the code
+	// compiles, and the code cannot compile until it is registered.
 	// The category word on line 1 must match this function's Category in CRM.
 	//
 	// Returns a JSON string: success, quote, items, rows, warnings.
@@ -28,11 +32,29 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	items = List();
 	warnings = List();
 
-	if((quote_id == null || quote_id.trim() == "") && (product_ids == null || product_ids.trim() == ""))
+	identifier = "";
+	if(quote_id != null)
+	{
+		identifier = quote_id.trim();
+	}
+	if(identifier == "")
 	{
 		result.put("success",false);
-		result.put("message","Supply either quote_id or product_ids.");
+		result.put("message","Missing quote_id.");
 		return result.toString();
+	}
+
+	// Which form the identifier takes. A record id is all digits, so the
+	// "products=" prefix is unambiguous.
+	quoteRecordId = "";
+	suppliedProductIds = "";
+	if(identifier.startsWith("products="))
+	{
+		suppliedProductIds = identifier.subString(9,identifier.length()).trim();
+	}
+	else
+	{
+		quoteRecordId = identifier;
 	}
 
 	// ---- 1. the quote this widget was launched from ---------------------
@@ -42,19 +64,19 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	quoteAccount = "";
 	quoteSubject = "";
 
-	if(quote_id != null && quote_id.trim() != "")
+	if(quoteRecordId != "")
 	{
-		quote = zoho.crm.getRecordById("Quotes",quote_id.trim().toLong());
+		quote = zoho.crm.getRecordById("Quotes",quoteRecordId.toLong());
 		if(quote == null || !quote.containKey("id"))
 		{
-			warnings.add("Quote record " + quote_id + " could not be read, so the header details are missing.");
+			warnings.add("Quote record " + quoteRecordId + " could not be read, so the header details are missing.");
 		}
 		else
 		{
 			quoteNumber = ifnull(quote.get("CRM_Quote_Number"),"").toString();
 			if(quoteNumber == "")
 			{
-				quoteNumber = ifnull(quote.get("Quote_Number"),quote_id).toString();
+				quoteNumber = ifnull(quote.get("Quote_Number"),quoteRecordId).toString();
 			}
 			if(quote.get("Account_Name") != null)
 			{
@@ -70,9 +92,9 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	productIds = List();
 	skuById = Map();
 
-	if(product_ids != null && product_ids.trim() != "")
+	if(suppliedProductIds != "")
 	{
-		for each rawProductId in product_ids.trim().toList(",")
+		for each rawProductId in suppliedProductIds.toList(",")
 		{
 			suppliedId = rawProductId.trim();
 			if(suppliedId != "" && !productIds.contains(suppliedId))
@@ -85,7 +107,7 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	{
 		try
 		{
-			ownCoql = "select Product_Name from Quoted_Items where Parent_Id = '" + quote_id.trim() + "' limit 0, 200";
+			ownCoql = "select Product_Name from Quoted_Items where Parent_Id = '" + quoteRecordId + "' limit 0, 200";
 			ownBody = Map();
 			ownBody.put("select_query",ownCoql);
 			ownResp = invokeurl
@@ -550,7 +572,7 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	quoteNumber = quoteNumber.replaceAll("\"","''");
 
 	quoteInfo = Map();
-	quoteInfo.put("id",quote_id);
+	quoteInfo.put("id",quoteRecordId);
 	quoteInfo.put("quote_number",quoteNumber.trim());
 	quoteInfo.put("subject",quoteSubject.trim());
 	quoteInfo.put("account_name",quoteAccount.trim());

@@ -75,11 +75,19 @@ So on this layout the subform is the only source of context. The Client Script
 reads its rows and passes `Parent_Id` when a row exposes it, plus the product
 ids either way - and the products are what the history is actually built from.
 
-The backend therefore accepts **either** identifier:
-`quote_item_history(quote_id, product_ids)`. `quote_id` derives the items
-itself; `product_ids` is a comma-separated list of CRM product record ids, for
-callers that can read the subform but not the quote. Passing `quote_id` alone
-behaves exactly as before.
+The backend accepts either identifier through its **one** argument, `quote_id`:
+
+| Value | Meaning |
+| --- | --- |
+| a record id | the line items are derived from the quote |
+| `products=<id,id,...>` | CRM product record ids, for callers that can read the subform but not the quote |
+
+**Why one argument and not two:** Zoho saves a function's argument list and its
+code together, so a second argument can never be added to an existing function.
+It will not register until the code compiles, and the code cannot compile until
+it is registered - the editor shows the new argument but the API keeps reporting
+the old list. Encoding both forms into the one registered argument sidesteps
+that entirely.
 
 The widget searches the payload rather than assuming a shape, and deliberately
 does **not** descend into `products`, `items`, `rows` or `line_items` when
@@ -99,6 +107,9 @@ otherwise "Price After Discount" cannot wrap and pushes past the table edge.
 
 Deluge is not JavaScript, and two limits shape this function:
 
+- **An argument cannot be added to an existing function.** The argument list
+  and the code are saved together, so each blocks the other. Encode extra
+  values into an existing argument instead.
 - **A bare boolean variable cannot be a whole `if` condition.** `if(myFlag)`
   fails to compile with "Improper Statement ... incomplete expression", while
   `if(!myFlag)` and `if(myFlag && x > 0)` are fine - an operator has to be
@@ -291,6 +302,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.4.2
+- **Version**: 1.5.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

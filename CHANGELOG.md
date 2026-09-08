@@ -2,6 +2,19 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.5.0] - 2026-09-08
+
+### Changed
+- The backend is back to **one** argument. Adding `product_ids` turned out to
+  be impossible: Zoho saves a function's argument list and its code together,
+  so the argument will not register until the code compiles and the code cannot
+  compile until it is registered. The editor displayed the new argument while
+  the API kept reporting `[quoteid]` through every attempt.
+- `quote_id` now carries either form - a record id, or `products=<id,id,...>`
+  for callers that can read the quote's subform but not the quote record. The
+  widget encodes whichever it has. Nothing needs registering, and passing a
+  plain record id behaves exactly as before.
+
 ## [1.4.2] - 2026-09-08
 
 ### Fixed

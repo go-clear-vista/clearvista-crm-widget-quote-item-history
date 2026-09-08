@@ -1372,10 +1372,13 @@ async function onPageLoad(data){
       }
     }
 
-    var payload = await executeFunction(FUNCTION_NAME, {
-      quote_id:    recordId ? String(recordId) : "",
-      product_ids: productIds.join(",")
-    });
+    // One argument carries both forms: a record id, or "products=<id,id,...>".
+    // Zoho cannot register a second argument on an existing function - it will
+    // not persist until the code compiles, and the code cannot compile until
+    // it is registered - so the identifier is encoded instead.
+    var identifier = recordId ? String(recordId) : ("products=" + productIds.join(","));
+
+    var payload = await executeFunction(FUNCTION_NAME, { quote_id: identifier });
 
     if(!payload || typeof payload !== "object"){
       throw new Error("The " + FUNCTION_NAME + " function returned no data.");
