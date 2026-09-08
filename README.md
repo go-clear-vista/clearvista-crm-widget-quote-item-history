@@ -14,6 +14,12 @@ Built to match the look and feel of the other ClearVista CRM widgets
 - **Document Type filter** - a checklist for Sales Quote (CRM), Sales Order (Books)
   and Sales Invoice (Books)
 - **Timeframe filter** - All, Last 3 months, Last 6 months, Last 12 months
+- **Account Name filter** - a checklist of the accounts appearing in the
+  history, **defaulting to this quote's account alone**, so the first thing a
+  user sees is what this customer has paid. Widening to other accounts is a
+  deliberate step, and the row count says "for 1 account" while it is narrowed.
+  With no account known - the edit layout cannot read the quote - it defaults
+  to all accounts rather than showing nothing
 - **Live table** - re-filters and re-sorts instantly as the filters change; no reload
 - **Sortable columns** - click any column header to sort; defaults to newest first
 - **Colour-coded pills** - document type and stage/status use the same colour map as
@@ -302,6 +308,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.5.0
+- **Version**: 1.6.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

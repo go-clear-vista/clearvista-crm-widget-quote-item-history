@@ -2,6 +2,28 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.6.0] - 2026-09-08
+
+### Added
+- **Account Name filter**, fourth in the row after Timeframe. A checklist of
+  the accounts present in the history, defaulting to **this quote's account
+  alone** - so the view opens on what this customer has paid, and comparing
+  against other accounts is a deliberate step rather than the default reading.
+  Select all widens it in one click.
+  - The row count reads "for 1 account" / "for N accounts" while narrowed, so
+    the filter is never silently hiding rows.
+  - With no account known (the edit layout cannot read the quote) it defaults
+    to all accounts rather than showing an empty table.
+  - Rows with no account are grouped under "(no account)" so they stay
+    reachable.
+- Checklists can start with a subset ticked rather than everything, which the
+  account filter needs.
+
+### Changed
+- The filter row is four across, dropping to two then one as the popup narrows.
+  Verified at 1450x860: four columns, table 1390px in 1390px, no horizontal
+  scrolling.
+
 ## [1.5.0] - 2026-09-08
 
 ### Changed

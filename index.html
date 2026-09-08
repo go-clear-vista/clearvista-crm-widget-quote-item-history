@@ -76,12 +76,22 @@
 
     .filters{
       display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
+      grid-template-columns:repeat(4,minmax(0,1fr));
       gap:14px;
     }
 
-    @media (max-width:860px){
+    @media (max-width:1180px){
+      .filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+
+    @media (max-width:620px){
       .filters{grid-template-columns:1fr}
+    }
+
+    .flabel-note{
+      font-weight:500;
+      color:#9ca3af;
+      font-size:11px;
     }
 
     label,.flabel{
@@ -584,6 +594,24 @@
         </div>
       </div>
 
+      <div>
+        <span class="flabel">Account Name <span class="flabel-note">this quote's account by default</span></span>
+        <div class="ms" id="accountMs">
+          <button class="ms-btn" type="button" id="accountMsBtn" disabled aria-expanded="false">
+            <span class="ms-btn-text" id="accountMsText">Loading...</span>
+            <span class="ms-count" id="accountMsCount" hidden></span>
+            <span class="chev"></span>
+          </button>
+          <div class="ms-panel" id="accountMsPanel">
+            <div class="ms-tools">
+              <button class="ms-link" type="button" data-ms-all="accountMs">Select all</button>
+              <button class="ms-link" type="button" data-ms-none="accountMs">Clear all</button>
+            </div>
+            <div class="ms-list" id="accountMsList"></div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <div class="warn" id="warnBox"></div>
@@ -647,6 +675,7 @@ var COLUMNS = [
 var recordId    = null;
 var quoteNumber = null;
 var suppliedProductNames = [];
+var NO_ACCOUNT = "(no account)";
 var allRows     = [];
 var sortKey     = "date";
 var sortDir     = -1;
@@ -760,11 +789,12 @@ function pill(text, colors){
  * Multi-select checklists
  * ------------------------------------------------------------------ */
 
-function MultiSelect(id, allLabel, noneLabel, onChange){
+function MultiSelect(id, allLabel, noneLabel, onChange, emptyText){
   this.id        = id;
   this.allLabel  = allLabel;
   this.noneLabel = noneLabel;
   this.onChange  = onChange;
+  this.emptyText = emptyText;
   this.options   = [];
 
   var self = this;
@@ -795,23 +825,32 @@ function MultiSelect(id, allLabel, noneLabel, onChange){
   });
 }
 
-MultiSelect.prototype.render = function(options){
+// checkedValues: tick only these. Omit to tick everything.
+MultiSelect.prototype.render = function(options, checkedValues){
   this.options = options || [];
 
   var list = el(this.id + "List");
   var self = this;
 
   if(!this.options.length){
-    list.innerHTML = '<div class="ms-empty">No items on this quote.</div>';
+    list.innerHTML = '<div class="ms-empty">' + esc(this.emptyText || "No items on this quote.") + "</div>";
     el(this.id + "Btn").disabled = true;
     this.syncLabel();
     return;
   }
 
+  var checkedSet = null;
+  if(Array.isArray(checkedValues)){
+    checkedSet = {};
+    checkedValues.forEach(function(value){ checkedSet[value] = true; });
+  }
+
   list.innerHTML = this.options.map(function(option, index){
     var inputId = self.id + "_opt_" + index;
+    var isChecked = checkedSet ? !!checkedSet[option.value] : true;
     return '<label class="ms-opt" for="' + inputId + '">' +
-             '<input type="checkbox" id="' + inputId + '" value="' + esc(option.value) + '" checked />' +
+             '<input type="checkbox" id="' + inputId + '" value="' + esc(option.value) + '"' +
+             (isChecked ? " checked" : "") + " />" +
              "<span>" + esc(option.label) + "</span>" +
            "</label>";
   }).join("");
@@ -877,8 +916,10 @@ document.addEventListener("keydown", function(event){
   if(event.key === "Escape") closeAllMultiSelects();
 });
 
-var itemFilter = new MultiSelect("itemMs", "All items", "No items", render);
-var docFilter  = new MultiSelect("docMs",  "All document types", "No document types", render);
+var itemFilter    = new MultiSelect("itemMs", "All items", "No items", render);
+var docFilter     = new MultiSelect("docMs",  "All document types", "No document types", render);
+var accountFilter = new MultiSelect("accountMs", "All accounts", "No accounts", render,
+                                    "No accounts in this history.");
 
 /* ------------------------------------------------------------------ *
  * Table rendering
@@ -917,18 +958,22 @@ function cutoffDate(months){
 }
 
 function visibleRows(){
-  var items    = itemFilter.selected();
-  var docs     = docFilter.selected();
-  var cutoff   = cutoffDate(el("timeframe").value);
-  var itemSet  = {};
-  var docSet   = {};
+  var items      = itemFilter.selected();
+  var docs       = docFilter.selected();
+  var accounts   = accountFilter.selected();
+  var cutoff     = cutoffDate(el("timeframe").value);
+  var itemSet    = {};
+  var docSet     = {};
+  var accountSet = {};
 
   items.forEach(function(value){ itemSet[value] = true; });
   docs.forEach(function(value){ docSet[value] = true; });
+  accounts.forEach(function(value){ accountSet[value] = true; });
 
   var rows = allRows.filter(function(row){
     if(!itemSet[row.item_name]) return false;
     if(!docSet[row.doc_type])   return false;
+    if(!accountSet[row.account_name || NO_ACCOUNT]) return false;
     if(cutoff && (!row.date || String(row.date) < cutoff)) return false;
     return true;
   });
@@ -981,7 +1026,7 @@ function renderBody(rows){
 
   if(!rows.length){
     var message = allRows.length
-      ? "<strong>No matching history</strong>Try widening the timeframe or selecting more items and document types."
+      ? "<strong>No matching history</strong>Try adding accounts, widening the timeframe, or selecting more items and document types."
       : "<strong>No item history found</strong>None of the items on this quote appear on any other quote, sales order or invoice yet.";
     body.innerHTML = '<tr><td class="empty" colspan="' + COLUMNS.length + '">' + message + "</td></tr>";
     return;
@@ -1015,9 +1060,19 @@ function render(){
   renderBody(rows);
 
   var total = allRows.length;
-  el("resultCount").textContent = total
+  var accountsPicked = accountFilter.selected().length;
+  var accountsTotal  = accountFilter.options.length;
+
+  var summary = total
     ? "Showing " + rows.length + " of " + total + " line " + (total === 1 ? "item" : "items")
     : "No history loaded";
+
+  if(total && accountsTotal > 1 && accountsPicked < accountsTotal){
+    summary += accountsPicked === 1
+      ? " for 1 account"
+      : " for " + accountsPicked + " accounts";
+  }
+  el("resultCount").textContent = summary;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1124,6 +1179,35 @@ function applyPayload(payload){
 
   itemFilter.render(unique.map(function(name){ return { value:name, label:name }; }));
   docFilter.render(DOC_TYPES);
+
+  // Accounts appearing in the history, plus this quote's own even if it has no
+  // rows yet, so the default selection is never empty.
+  var accountNames = [];
+  var accountSeen  = {};
+  allRows.forEach(function(row){
+    var name = row.account_name || NO_ACCOUNT;
+    if(!accountSeen[name]){ accountSeen[name] = true; accountNames.push(name); }
+  });
+
+  var current = payload.quote && payload.quote.account_name
+    ? String(payload.quote.account_name).trim()
+    : "";
+
+  if(current && !accountSeen[current]){
+    accountSeen[current] = true;
+    accountNames.push(current);
+  }
+  accountNames.sort();
+
+  // Default to this quote's account only - widening to other accounts is a
+  // deliberate step, so a cross-account comparison is never accidental. With
+  // no known account (the edit layout cannot read the quote) show everything.
+  var defaultAccounts = (current && accountSeen[current]) ? [current] : accountNames;
+
+  accountFilter.render(
+    accountNames.map(function(name){ return { value:name, label:name }; }),
+    defaultAccounts
+  );
 
   setWarning(payload.warnings);
   render();
@@ -1397,6 +1481,7 @@ async function onPageLoad(data){
     console.error(error);
     itemFilter.render([]);
     docFilter.render(DOC_TYPES);
+    accountFilter.render([]);
     render();
     setStatus(error && error.message ? error.message : "Unable to load item history.", "error");
   }
