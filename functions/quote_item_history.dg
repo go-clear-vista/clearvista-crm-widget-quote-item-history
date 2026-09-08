@@ -83,51 +83,51 @@ string automation.quote_item_history(String quote_id, String product_ids)
 	}
 	else
 	{
-	try
-	{
-		ownCoql = "select Product_Name from Quoted_Items where Parent_Id = '" + quote_id.trim() + "' limit 0, 200";
-		ownBody = Map();
-		ownBody.put("select_query",ownCoql);
-		ownResp = invokeurl
-		[
-			url :"https://www.zohoapis.com/crm/v7/coql"
-			type :POST
-			parameters:ownBody.toString()
-			connection:"crm_api_v21"
-		];
-		ownData = ownResp.get("data");
-		if(ownData == null)
+		try
 		{
-			warnings.add("The Quoted_Items query returned no data. CRM replied: " + ownResp.toString());
+			ownCoql = "select Product_Name from Quoted_Items where Parent_Id = '" + quote_id.trim() + "' limit 0, 200";
+			ownBody = Map();
+			ownBody.put("select_query",ownCoql);
+			ownResp = invokeurl
+			[
+				url :"https://www.zohoapis.com/crm/v7/coql"
+				type :POST
+				parameters:ownBody.toString()
+				connection:"crm_api_v21"
+			];
+			ownData = ownResp.get("data");
+			if(ownData == null)
+			{
+				warnings.add("The Quoted_Items query returned no data. CRM replied: " + ownResp.toString());
+			}
+			for each ownLine in ifnull(ownData,List())
+			{
+				product = ownLine.get("Product_Name");
+				if(product == null)
+				{
+					continue;
+				}
+				productId = ifnull(product.get("id"),"").toString();
+				sku = ifnull(product.get("name"),"").toString();
+				if(productId == "" || sku == "")
+				{
+					continue;
+				}
+				if(!productIds.contains(productId))
+				{
+					productIds.add(productId);
+					skuById.put(productId,sku);
+				}
+				if(!items.contains(sku))
+				{
+					items.add(sku);
+				}
+			}
 		}
-		for each ownLine in ifnull(ownData,List())
+		catch (e)
 		{
-			product = ownLine.get("Product_Name");
-			if(product == null)
-			{
-				continue;
-			}
-			productId = ifnull(product.get("id"),"").toString();
-			sku = ifnull(product.get("name"),"").toString();
-			if(productId == "" || sku == "")
-			{
-				continue;
-			}
-			if(!productIds.contains(productId))
-			{
-				productIds.add(productId);
-				skuById.put(productId,sku);
-			}
-			if(!items.contains(sku))
-			{
-				items.add(sku);
-			}
+			warnings.add("The line items on this quote could not be read - check the crm_api_v21 connection: " + e.toString());
 		}
-	}
-	catch (e)
-	{
-		warnings.add("The line items on this quote could not be read - check the crm_api_v21 connection: " + e.toString());
-	}
 	}
 
 	if(productIds.size() > 0)
@@ -362,6 +362,23 @@ string automation.quote_item_history(String quote_id, String product_ids)
 					booksSku = ifnull(skuById.get(productId),"").toString();
 					if(booksSku == "")
 					{
+						// No CRM history line supplied the SKU - read the
+						// product record so Books is still searched for it.
+						try
+						{
+							productRecord = zoho.crm.getRecordById("Products",productId.toLong());
+							if(productRecord != null)
+							{
+								booksSku = ifnull(productRecord.get("Product_Code"),ifnull(productRecord.get("Product_Name"),"")).toString();
+							}
+						}
+						catch (e)
+						{
+							booksSku = "";
+						}
+					}
+					if(booksSku == "")
+					{
 						continue;
 					}
 					try
@@ -469,7 +486,7 @@ string automation.quote_item_history(String quote_id, String product_ids)
 		warnings.add("No line items with a linked product were found, so there is nothing to build a history from.");
 	}
 
-	// ---- 5. make every free-text value safe to embed in JSON ------------ *
+	// ---- 5. make every free-text value safe to embed in JSON ------------
 	// The response is assembled with Map.toString(), which does NOT escape
 	// characters that are structural in JSON. Real ClearVista data trips this
 	// constantly - inch marks in product names and quote subjects (65"

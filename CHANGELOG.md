@@ -2,6 +2,20 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.4.2] - 2026-09-08
+
+### Fixed
+- A product with no CRM quote history was skipped by the Books lookup. SKUs are
+  seeded from the history rows, so a product appearing on no other quote had no
+  entry and its sales orders and invoices were never searched. The Books step
+  now falls back to reading the product record for its `Product_Code`.
+
+### Changed
+- Reindented the COQL branch of the item read, which sat a level short of its
+  enclosing `else` and made the nesting hard to follow, and removed a stray `*`
+  left on a comment rule by the earlier block-comment conversion. No behaviour
+  change.
+
 ## [1.4.1] - 2026-09-08
 
 ### Fixed
