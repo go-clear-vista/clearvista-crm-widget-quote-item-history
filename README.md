@@ -44,8 +44,12 @@ Deluge is not JavaScript, and two limits shape this function:
   capping the CRM quote history at 10 pages x 200 rows = 2000 line items.
 - **`connection:` on an `invokeurl` must be a literal**, not a variable - Deluge
   rejects a String with *"does not match the required data type 'CONNECTION
-  LINKNAME'"*. The connection link name is therefore hard-coded in both
-  `invokeurl` blocks; rename the connection and you must edit both by hand.
+  LINKNAME'"*. The connection link name is therefore hard-coded in all three
+  `invokeurl` blocks; rename the connection and you must edit each by hand.
+- **`getRecordById` does not return subform rows.** It returns the quote's own
+  fields, so the line items are read over COQL against the `Quoted_Items`
+  module instead. A quote that visibly has items but reports none is the
+  symptom of reading the subform off the parent record.
 - **One function per definition, signature on line 1.** Everything is inlined
   into the single function rather than split into helpers.
 
@@ -197,6 +201,7 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is empty in the function |
 | Table shows quotes but no orders/invoices | The CRM SKU has no matching Books item, or the Books item has no documents in the selected timeframe |
 | "No item history found" | None of this quote's products appear on any other document yet |
+| Banner: "No line items with a linked product were found" | The quote's line items have no linked product, or the COQL read of `Quoted_Items` failed - check the banner for a connection error alongside it |
 | Widget shows sample data inside CRM | The Embedded App SDK could not load - check that `live.zwidgets.com` is reachable |
 | Last columns cut off | Increase the widget popup width, or scroll the table horizontally |
 
@@ -211,6 +216,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.0.6
+- **Version**: 1.0.7
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

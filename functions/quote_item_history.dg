@@ -13,7 +13,7 @@ string automation.quote_item_history(String quote_id)
 	// COQL connection: "crm_api_v21" - needs scope ZohoCRM.coql.READ, and is
 	//   used to query the Quoted_Items subform module across all quotes. Deluge
 	//   requires a LITERAL connection link name on an invokeurl, so if the
-	//   connection is renamed, update both invokeurl blocks below by hand.
+	//   connection is renamed, update all three invokeurl blocks below by hand.
 	// BOOKS_ORG_ID   - Zoho Books organization ID. Set it to "" to run against
 	//                  CRM sales quotes only; the widget says so in a banner.
 	// Neither failure is fatal - the widget renders whatever it could load.
@@ -54,31 +54,50 @@ string automation.quote_item_history(String quote_id)
 	}
 
 	// ---- 2. the items on this quote drive the Item Name checklist --------
+	// getRecordById returns the quote's own fields but NOT its subform rows, so
+	// read the line items over COQL - the same path the history below uses.
 	productIds = List();
 	skuById = Map();
 
-	for each lineItem in ifnull(quote.get("Quoted_Items"),List())
+	try
 	{
-		product = lineItem.get("Product_Name");
-		if(product == null)
+		ownCoql = "select Product_Name from Quoted_Items where Parent_Id = '" + quote_id.trim() + "' limit 0, 200";
+		ownBody = Map();
+		ownBody.put("select_query",ownCoql);
+		ownResp = invokeurl
+		[
+			url :"https://www.zohoapis.com/crm/v7/coql"
+			type :POST
+			parameters:ownBody.toString()
+			connection:"crm_api_v21"
+		];
+		for each ownLine in ifnull(ownResp.get("data"),List())
 		{
-			continue;
+			product = ownLine.get("Product_Name");
+			if(product == null)
+			{
+				continue;
+			}
+			productId = ifnull(product.get("id"),"").toString();
+			sku = ifnull(product.get("name"),"").toString();
+			if(productId == "" || sku == "")
+			{
+				continue;
+			}
+			if(!productIds.contains(productId))
+			{
+				productIds.add(productId);
+				skuById.put(productId,sku);
+			}
+			if(!items.contains(sku))
+			{
+				items.add(sku);
+			}
 		}
-		productId = ifnull(product.get("id"),"").toString();
-		sku = ifnull(product.get("name"),"").toString();
-		if(productId == "" || sku == "")
-		{
-			continue;
-		}
-		if(!productIds.contains(productId))
-		{
-			productIds.add(productId);
-			skuById.put(productId,sku);
-		}
-		if(!items.contains(sku))
-		{
-			items.add(sku);
-		}
+	}
+	catch (e)
+	{
+		warnings.add("The line items on this quote could not be read - check the crm_api_v21 connection: " + e.toString());
 	}
 
 	if(productIds.size() > 0)
@@ -398,7 +417,7 @@ string automation.quote_item_history(String quote_id)
 	}
 	else
 	{
-		warnings.add("This quote has no line items with a linked product, so there is nothing to build a history from.");
+		warnings.add("No line items with a linked product were found on this quote, so there is nothing to build a history from.");
 	}
 
 	// ---- 5. make every free-text value safe to embed in JSON ------------ *

@@ -2,6 +2,16 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.0.7] - 2026-09-08
+
+### Fixed
+- The widget reported "no line items with a linked product" on quotes that
+  plainly have them. `zoho.crm.getRecordById` returns a quote's own fields but
+  not its subform rows, so `Quoted_Items` came back empty. The line items are
+  now read over COQL against the `Quoted_Items` module - the same path the
+  history already used - and a failure there is reported in the banner rather
+  than looking like an empty quote.
+
 ## [1.0.6] - 2026-09-08
 
 ### Added
