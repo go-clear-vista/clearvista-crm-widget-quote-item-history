@@ -2,6 +2,26 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.2.0] - 2026-09-08
+
+### Removed
+- The Description column. It repeated the same boilerplate on every row for a
+  given item and cost 18% of the table width. The text is still in the data and
+  is now the tooltip on the item name.
+
+### Changed
+- Nine columns are redistributed to fill the popup, and the table's floor drops
+  from 1000px to 820px - so it fits Zoho's fixed widget modal with no
+  horizontal scrolling. Verified clean at 1500, 1120, 940 and 880px.
+
+### Added
+- `client-script/see_historical_prices.js`, which opens this widget through
+  `ZDK.Client.openPopup()` at 1450x860 for a larger box than the fixed
+  widget-action modal allows, modelled on the org's Distributor Search script.
+- The record id is resolved from `PageLoad`'s `EntityId`, `data.quote_id` in an
+  `openPopup` payload, or `?id=` on the URL, so the widget works under either
+  button shape. The PageLoad payload is logged to aid diagnosis.
+
 ## [1.1.1] - 2026-09-08
 
 ### Changed

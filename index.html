@@ -300,7 +300,7 @@
 
     table{
       width:100%;
-      min-width:1000px;
+      min-width:820px;
       table-layout:fixed;
       border-collapse:separate;
       border-spacing:0;
@@ -353,11 +353,6 @@
     .c-item{
       font-weight:700;
       overflow-wrap:anywhere;
-    }
-
-    .c-desc{
-      color:var(--text);
-      line-height:1.45;
     }
 
     .c-notes{
@@ -630,17 +625,19 @@ var DOC_TYPES = [
   { value: "Sales Invoice", label: "Sales Invoice (Books)" }
 ];
 
+// Description is deliberately not a column - it is the same boilerplate on every
+// row for a given item and cost 18% of the width. It is kept in the data and
+// shown as a tooltip on the item name instead.
 var COLUMNS = [
-  { key: "item_name",            label: "Item Name",            type: "text", width: "9.5%"  },
-  { key: "description",          label: "Description",          type: "text", width: "18%"   },
-  { key: "item_notes",           label: "Item Notes",           type: "text", width: "8%"    },
-  { key: "doc_type",             label: "Doc Type",             type: "text", width: "10%"   },
-  { key: "date",                 label: "Date",                 type: "text", width: "8%"    },
-  { key: "account_name",         label: "Account Name",         type: "text", width: "12.5%" },
-  { key: "status",               label: "Stage / Status",       type: "text", width: "9.5%"  },
-  { key: "item_price",           label: "Item Price",           type: "num",  width: "7.5%"  },
-  { key: "discount",             label: "Discount",             type: "num",  width: "8%"    },
-  { key: "price_after_discount", label: "Price After Discount", type: "num",  width: "9%"    }
+  { key: "item_name",            label: "Item Name",            type: "text", width: "13%"   },
+  { key: "item_notes",           label: "Item Notes",           type: "text", width: "9.5%"  },
+  { key: "doc_type",             label: "Doc Type",             type: "text", width: "11.5%" },
+  { key: "date",                 label: "Date",                 type: "text", width: "11%"   },
+  { key: "account_name",         label: "Account Name",         type: "text", width: "15%"   },
+  { key: "status",               label: "Stage / Status",       type: "text", width: "11.5%" },
+  { key: "item_price",           label: "Item Price",           type: "num",  width: "8.5%"  },
+  { key: "discount",             label: "Discount",             type: "num",  width: "10%"   },
+  { key: "price_after_discount", label: "Price After Discount", type: "num",  width: "10%"   }
 ];
 
 var recordId    = null;
@@ -993,8 +990,7 @@ function renderBody(rows){
     var unitAfter  = row.price_after_discount;
 
     return "<tr>" +
-      '<td class="c-item">'  + esc(row.item_name || "—") + "</td>" +
-      '<td class="c-desc">'  + (row.description ? esc(row.description) : "—") + "</td>" +
+      '<td class="c-item" title="' + esc(row.description || "") + '">' + esc(row.item_name || "—") + "</td>" +
       '<td class="c-notes">' + (row.item_notes  ? esc(row.item_notes)  : "—") + "</td>" +
       "<td>" + pill(row.doc_type || "—", docColors) + docNumber + "</td>" +
       '<td class="c-date">'  + formatDate(row.date) + "</td>" +
@@ -1188,15 +1184,39 @@ renderBody([]);
 var initialised = false;
 var sdkReady = (typeof ZOHO !== "undefined") && !!(ZOHO.embeddedApp);
 
+// A widget-action button supplies the record as EntityId. A Client Script
+// popup (ZDK.Client.openPopup) may instead pass it in the data payload, so
+// accept both, plus ?id= on the URL as a last resort.
+function resolveRecordId(data){
+  if(data){
+    if(data.EntityId){
+      return Array.isArray(data.EntityId) ? data.EntityId[0] : data.EntityId;
+    }
+    if(data.entity_id) return data.entity_id;
+
+    var payload = data.data || data.Data || null;
+    if(payload){
+      var candidate = payload.quote_id || payload.record_id || payload.id || payload.EntityId;
+      if(candidate) return Array.isArray(candidate) ? candidate[0] : candidate;
+    }
+  }
+
+  var match = String(window.location.search || "").match(/[?&](?:id|quote_id|record_id)=(\d+)/);
+  return match ? match[1] : null;
+}
+
 async function onPageLoad(data){
   initialised = true;
-  recordId = Array.isArray(data.EntityId) ? data.EntityId[0] : data.EntityId;
+  console.log("PageLoad data:", data);
+  recordId = resolveRecordId(data);
 
   resizePopup();
   setStatus("Loading item history...", "loading");
 
   try {
-    if(!recordId) throw new Error("No quote record ID was supplied by CRM.");
+    if(!recordId){
+      throw new Error("No quote record ID was supplied. If this widget is opened from a Client Script, pass the record id as data.quote_id in the openPopup call.");
+    }
 
     var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });
     var record   = response && response.data && response.data[0] ? response.data[0] : null;

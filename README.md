@@ -26,8 +26,8 @@ Built to match the look and feel of the other ClearVista CRM widgets
 | Column | Source |
 | --- | --- |
 | Item Name | `Quoted_Items.Product_Name` (CRM) / line item SKU (Books) |
-| Description | `Quoted_Items.Description` / Books line `description` |
 | Item Notes | `Quoted_Items.Item_Notes` (CRM only - Books lines have no equivalent) |
+| _(Description)_ | Not a column - it repeats on every row for a given item and cost 18% of the table width. Kept in the data and shown as a tooltip on the item name. |
 | Doc Type | Sales Quote / Sales Order / Sales Invoice, with the document number beneath |
 | Date | Quote `Date_created_on_document`, or the Books document `date` |
 | Account Name | Quote `Account_Name`, or the Books `customer_name` |
@@ -46,21 +46,28 @@ choose the popup size:
 | `widget` | Zoho renders the page in its own fixed modal (roughly 880px wide). `ZOHO.CRM.UI.Resize()` and `ZOHO.CRM.UI.Popup.resize()` are called on load but a widget-action modal may ignore both. |
 | `cscript` | A Client Script opens the popup and passes explicit `height`/`width`, so the size is yours to set. |
 
-The table needs about 1000px for its ten columns, so in the fixed modal it
-scrolls horizontally. To get a wider box, drive the button from a Client Script
-that opens **the registered widget** (not a bare URL) with explicit dimensions -
-the same approach the org's `Distributor_Search` button uses.
+The nine columns need about 820px, so the table fits the fixed modal. For a
+larger box, point the button at `client-script/see_historical_prices.js`
+instead, which opens the same registered widget through
+`ZDK.Client.openPopup()` with explicit dimensions - the approach the org's
+`Distributor_Search` button uses.
 
 Opening a bare URL instead of the registered widget loses the Embedded App SDK
 context, and with it `ZOHO.CRM.API` and `ZOHO.CRM.FUNCTIONS` - the widget would
-have no way to read the quote or call its backend.
+have no way to read the quote or call its backend. The `api_name` in the script
+must therefore be the **widget's** API name from Setup → Developer Space →
+Widgets, not the button's.
+
+The widget takes its record id from `PageLoad`'s `EntityId`, and also accepts
+`data.quote_id` from the `openPopup` payload or `?id=` on the URL, so it works
+under either button shape.
 
 ### Table layout
 
-The table uses `table-layout: fixed` with percentage column widths, so the ten
+The table uses `table-layout: fixed` with percentage column widths, so the nine
 columns always divide the popup exactly and text wraps inside its column rather
 than widening the table. Below a 1000px `min-width` floor the table scrolls
-horizontally instead of crushing. Cells carry `.c-num` for right alignment; note
+horizontally instead of crushing (the floor is 820px). Cells carry `.c-num` for right alignment; note
 that header cells must override the `white-space: nowrap` that class brings,
 otherwise "Price After Discount" cannot wrap and pushes past the table edge.
 
@@ -255,6 +262,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.1.1
+- **Version**: 1.2.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books
