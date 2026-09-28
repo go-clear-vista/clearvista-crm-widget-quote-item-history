@@ -285,7 +285,7 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 2. Click the **Item History** button
 3. Confirm the reference line at the bottom shows the correct sales quote number
 4. Toggle items, document types and timeframes and confirm the table updates instantly
-5. Confirm Books rows appear once `BOOKS_ORG_ID` is set
+5. Confirm Books rows appear once the Analytics connection and IDs are set
 
 ## Troubleshooting
 
