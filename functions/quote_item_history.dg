@@ -584,7 +584,26 @@ string automation.quote_item_history(String quote_id)
 							headers:analyticsHeaders
 							connection:"zohoanalytics"
 						];
-						csvLines = csvText.toString().toList("\n");
+						// Strip the CSV's own quoting up front: the SQL already turned every
+						// double quote in the data into '' , so any " left is CSV wrapping.
+						// toList() can choke on quoted text, so split only after this.
+						csvString = ifnull(csvText,"").toString();
+						csvString = csvString.replaceAll("\"","");
+						csvString = csvString.replaceAll("\r","");
+						if(csvString.length() < 5)
+						{
+							warnings.add(docType + " history: Analytics returned no rows. Reply started: " + csvString);
+						}
+						csvLines = List();
+						try
+						{
+							csvLines = csvString.toList("\n");
+						}
+						catch (splitError)
+						{
+							warnings.add(docType + " history: the Analytics reply could not be split into lines (" + splitError.toString() + "). Reply started: " + csvString.subString(0,120));
+							continue;
+						}
 						rowCount = 0;
 						for each csvLine in csvLines
 						{

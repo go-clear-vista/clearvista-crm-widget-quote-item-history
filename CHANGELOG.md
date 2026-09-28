@@ -2,6 +2,15 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.2] - 2026-09-28
+
+### Fixed
+- The Analytics reply failed to parse ("Unable to convert the input text to
+  decimal" at the line-split). The CSV's own quotes and carriage returns are now
+  stripped before splitting, and a split failure reports the start of the reply
+  in the banner rather than a bare error.
+- The connection link name is `zohoanalytics` (the existing connection).
+
 ## [1.8.1] - 2026-09-28
 
 ### Fixed
