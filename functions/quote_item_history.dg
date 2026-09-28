@@ -540,9 +540,11 @@ string automation.quote_item_history(String quote_id)
 						priceColumn = "Item Price";
 						discountColumn = "Discount Amount (BCY)";
 					}
+					stage = "start";
 					try
 					{
 						// 1. the line items for these SKUs
+						stage = "building the line request";
 						lineColumns = List();
 						lineColumns.add(idColumn);
 						lineColumns.add("Item Name");
@@ -558,6 +560,7 @@ string automation.quote_item_history(String quote_id)
 						lineConfig.put("criteria","\"" + itemTable + "\".\"Item Name\" in (" + skuClause + ")");
 						lineParams = Map();
 						lineParams.put("CONFIG",lineConfig.toString());
+						stage = "line request";
 						lineResp = invokeurl
 						[
 							url :viewBase + itemView + "/data"
@@ -566,10 +569,21 @@ string automation.quote_item_history(String quote_id)
 							headers:analyticsHeaders
 							connection:"zohoanalytics"
 						];
+						stage = "line reply parse";
 						lineNode = lineResp.get("data");
-						if(lineNode != null && lineNode.toString().startsWith("{"))
+						// The rows sit at data (a list) or one level deeper at data.data,
+						// depending on how the reply is wrapped. Which one is decided by
+						// trying to read .data: a list rejects a text key, so it is kept as is.
+						try
 						{
-							lineNode = lineNode.get("data");
+							lineInner = lineNode.get("data");
+							if(lineInner != null)
+							{
+								lineNode = lineInner;
+							}
+						}
+						catch (unwrapError)
+						{
 						}
 						if(lineNode == null)
 						{
@@ -583,6 +597,7 @@ string automation.quote_item_history(String quote_id)
 						}
 
 						// 2. headers for just those documents, in batches of 100
+						stage = "collecting document ids";
 						docIds = List();
 						for each lineRow in lineList
 						{
@@ -602,6 +617,7 @@ string automation.quote_item_history(String quote_id)
 							idSeen = idSeen + 1;
 							if(idBatch.size() == 100 || idSeen == docIds.size())
 							{
+								stage = "header request";
 								headerColumns = List();
 								headerColumns.add(idColumn);
 								headerColumns.add(numberColumn);
@@ -632,14 +648,22 @@ string automation.quote_item_history(String quote_id)
 									connection:"zohoanalytics"
 								];
 								headerNode = headerResp.get("data");
-								if(headerNode != null && headerNode.toString().startsWith("{"))
+								try
 								{
-									headerNode = headerNode.get("data");
+									headerInner = headerNode.get("data");
+									if(headerInner != null)
+									{
+										headerNode = headerInner;
+									}
+								}
+								catch (unwrapError)
+								{
 								}
 								if(headerNode == null)
 								{
 									warnings.add(docType + " headers could not be read from Analytics. Analytics replied: " + headerResp.toString());
 								}
+								stage = "header reply parse";
 								for each headerRow in ifnull(headerNode,List())
 								{
 									headerId = ifnull(headerRow.get(idColumn),"").toString();
@@ -667,6 +691,7 @@ string automation.quote_item_history(String quote_id)
 							customerSeen = customerSeen + 1;
 							if(customerBatch.size() == 100 || customerSeen == customerIds.size())
 							{
+								stage = "customer request";
 								customerColumns = List();
 								customerColumns.add("Customer ID");
 								customerColumns.add("Customer Name");
@@ -694,9 +719,16 @@ string automation.quote_item_history(String quote_id)
 									connection:"zohoanalytics"
 								];
 								customerNode = customerResp.get("data");
-								if(customerNode != null && customerNode.toString().startsWith("{"))
+								try
 								{
-									customerNode = customerNode.get("data");
+									customerInner = customerNode.get("data");
+									if(customerInner != null)
+									{
+										customerNode = customerInner;
+									}
+								}
+								catch (unwrapError)
+								{
 								}
 								for each customerRow in ifnull(customerNode,List())
 								{
@@ -707,6 +739,7 @@ string automation.quote_item_history(String quote_id)
 						}
 
 						// 4. assemble the rows
+						stage = "assembling rows";
 						rowCount = 0;
 						for each lineRow in lineList
 						{
@@ -776,7 +809,7 @@ string automation.quote_item_history(String quote_id)
 					}
 					catch (e)
 					{
-						warnings.add(docType + " history could not be loaded from Analytics: " + e.toString());
+						warnings.add(docType + " history could not be loaded from Analytics (stage: " + stage + "): " + e.toString());
 					}
 				}
 			}

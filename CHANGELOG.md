@@ -2,6 +2,21 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.8] - 2026-09-28
+
+### Fixed
+- **Quote number and account default without a quote id.** The edit layout
+  exposes neither the id nor `CRM_Quote_Number`, but the page API does return
+  `Subject` and `Account_Name` (confirmed from the banner probe). The Client
+  Script now sends both, and the widget finds the quote they identify - the most
+  recently modified match - with a COQL lookup, then reads `CRM_Quote_Number`
+  from it. The account name alone already fixed the account default.
+- **Analytics "'get' ... [BIGINT]" error, second attempt.** It persisted after
+  the settings were unpacked differently, so the cause is elsewhere in the read.
+  Whether a reply is wrapped (`data.data`) or bare (`data`) is now decided by
+  trying `.get("data")` and falling back, instead of testing the reply's text,
+  and each stage records its name so a failure says where it happened.
+
 ## [1.8.7] - 2026-09-28
 
 ### Fixed

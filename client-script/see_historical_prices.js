@@ -189,6 +189,18 @@ function probePageApi() {
   console.log("CS: page API probe: " + fieldProbe);
 }
 
+// Plain values from the form, used to find the quote when no id is exposed.
+function readFormValue(apiName, key) {
+  try {
+    var field = ZDK.Page.getField(apiName);
+    var value = field && field.getValue ? field.getValue() : null;
+    if (value && typeof value === "object") return value[key] ? String(value[key]) : "";
+    return value ? String(value) : "";
+  } catch (err) {
+    return "";
+  }
+}
+
 function readAccountName() {
   try {
     var field = ZDK.Page.getField("Account_Name");
@@ -238,6 +250,8 @@ try {
         urls_seen: urlsSeen || "not probed (a subform row supplied the parent id)",
         account_name: accountName,
         field_probe: fieldProbe,
+        subject: readFormValue("Subject", "name"),
+        account_id: readFormValue("Account_Name", "id"),
       },
       wait: true,
     },

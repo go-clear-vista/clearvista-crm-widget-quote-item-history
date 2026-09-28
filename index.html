@@ -1567,6 +1567,48 @@ async function recordIdFromQuoteNumber(number){
   return null;
 }
 
+// The edit layout exposes neither the record id nor the quote number, but it does
+// expose Subject and Account. Find the quote they identify: the most recently
+// modified one, which is the quote being worked on.
+async function recordIdFromSubject(subject, accountId){
+  if(!subject) return null;
+  var quoted = String(subject).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  var where  = "Subject = '" + quoted + "'" + (accountId ? " and Account_Name = '" + accountId + "'" : "");
+
+  try {
+    var response = await ZOHO.CRM.API.coql({
+      select_query: "select id, CRM_Quote_Number from Quotes where " + where + " order by Modified_Time desc limit 1"
+    });
+    var match = response && response.data && response.data[0] ? response.data[0] : null;
+    if(match && match.id){
+      console.log("Resolved quote from subject to id " + match.id);
+      if(match.CRM_Quote_Number) setReference(match.CRM_Quote_Number);
+      return String(match.id);
+    }
+  } catch(error){
+    console.log("coql lookup by subject failed:", error);
+  }
+
+  try {
+    var found = await ZOHO.CRM.API.searchRecord({
+      Entity: MODULE_API_NAME,
+      Type: "criteria",
+      Query: "(Subject:equals:" + subject + ")"
+    });
+    var rows = found && found.data ? found.data : [];
+    for(var i = 0; i < rows.length; i++){
+      var account = rows[i].Account_Name;
+      if(!accountId || (account && String(account.id) === String(accountId))){
+        if(rows[i].CRM_Quote_Number) setReference(rows[i].CRM_Quote_Number);
+        return String(rows[i].id);
+      }
+    }
+  } catch(error){
+    console.log("searchRecord by subject failed:", error);
+  }
+  return null;
+}
+
 async function onPageLoad(data){
   initialised = true;
   console.log("PageLoad data:", data);
@@ -1584,6 +1626,15 @@ async function onPageLoad(data){
       if(number){
         setStatus("Looking up quote " + number + "...", "loading");
         recordId = await recordIdFromQuoteNumber(number);
+      }
+    }
+
+    if(!recordId){
+      var formSubject = findStringKey(data, "subject", 0);
+      var formAccountId = findStringKey(data, "account_id", 0);
+      if(formSubject){
+        setStatus("Looking up the quote by its subject...", "loading");
+        recordId = await recordIdFromSubject(formSubject, formAccountId);
       }
     }
 
