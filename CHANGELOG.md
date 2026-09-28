@@ -2,6 +2,17 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.9.0] - 2026-09-28
+
+### Changed
+- **Removed the Close button** and its handler: a Client Script popup ignores the
+  SDK close, so it could not work. The popup's own X closes it.
+- **Removed the "Item History" title inside the widget**, leaving only the
+  "Review past pricing..." line under the popup header.
+- The popup header, set in the Client Script's `openPopup` call, now reads
+  **Item History** instead of "See Historical Sale Price". Re-paste the script
+  for this to take effect; the button's own name is unchanged.
+
 ## [1.8.9] - 2026-09-28
 
 ### Changed

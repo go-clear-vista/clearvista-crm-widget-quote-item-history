@@ -229,7 +229,7 @@ try {
     {
       api_name: "See_Historical_Sale_Price",
       type: "widget",
-      header: "See Historical Sale Price",
+      header: "Item History",
       animation_type: 1,
       close_icon: true,
       close_on_escape: true,

@@ -26,7 +26,7 @@ Built to match the look and feel of the other ClearVista CRM widgets
 - **Colour-coded pills** - document type and stage/status use the same colour map as
   the other ClearVista widgets, extended with Books statuses
 - **Quote reference line** - states which sales quote number is being referenced
-- **Close button** - closes the widget popup
+- **Closing** - use the X in the popup header. There is deliberately no in-widget Close button: a popup opened by a Client Script ignores the SDK close call, so the button could not work.
 
 ## Table columns
 
@@ -321,6 +321,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.8.9
+- **Version**: 1.9.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

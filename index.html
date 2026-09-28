@@ -83,7 +83,7 @@
     }
 
     .header p{
-      margin:6px 0 0;
+      margin:0;
       font-size:12.5px;
       color:var(--muted);
     }
@@ -577,7 +577,6 @@
 
 <div class="panel">
   <div class="header">
-    <h1>Item History</h1>
     <p>Review past pricing for the items on this quote across sales quotes, sales orders and invoices.</p>
   </div>
 
@@ -677,10 +676,6 @@
       <div class="spinner" id="statusSpinner"></div>
       <span id="statusText"></span>
     </div>
-  </div>
-
-  <div class="footer">
-    <button class="btn btn-primary" type="button" id="closeBtn">Close</button>
   </div>
 
   <div class="reference-text" id="referenceText">Showing item history for Sales Quote Number: —</div>
@@ -1321,54 +1316,6 @@ function resizePopup(){
     console.log("ZOHO.CRM.UI.Popup.resize threw:", error);
   }
 }
-
-var closeTriedOnce = false;
-
-el("closeBtn").addEventListener("click", function(){
-  // Second click: the safe routes did not close this popup (a Client Script
-  // popup ignores the plain SDK close). closeReload does close it, but also
-  // reloads the quote form underneath, so it is only used when asked for twice.
-  if(closeTriedOnce){
-    try { ZOHO.CRM.UI.Popup.closeReload(); }
-    catch(error){ setStatus("Could not close the popup - use the X at the top right of this window.", "error"); }
-    return;
-  }
-  closeTriedOnce = true;
-
-  // Popups opened by a Client Script (ZDK.Client.openPopup) can ignore the
-  // SDK close on some builds, so try each route and, if the popup is still
-  // here afterwards, say where the working close control is. closeReload is
-  // deliberately not used: it would reload the quote form under the popup and
-  // lose unsaved edits.
-  // Each attempt's outcome is recorded and, if the popup is still here, shown
-  // - so a failure says which routes were tried and what each returned.
-  var outcomes = [];
-  var attempts = [
-    ["SDK close", function(){ return ZOHO.CRM.UI.Popup.close(); }],
-    ["postMessage", function(){
-      window.parent.postMessage({ action: "close", type: "close", event: "close" }, "*");
-      window.parent.postMessage(JSON.stringify({ action: "close", type: "close", event: "close" }), "*");
-    }],
-    ["window.close", function(){ window.close(); }]
-  ];
-  attempts.forEach(function(attempt){
-    var name = attempt[0];
-    try {
-      var result = attempt[1]();
-      if(result && typeof result.then === "function"){
-        result.then(function(value){ outcomes.push(name + ": resolved " + JSON.stringify(value)); },
-                    function(error){ outcomes.push(name + ": rejected " + (error && error.message ? error.message : JSON.stringify(error))); });
-      } else {
-        outcomes.push(name + ": sent");
-      }
-    } catch(error){
-      outcomes.push(name + ": threw " + (error && error.message ? error.message : error));
-    }
-  });
-  setTimeout(function(){
-    setStatus("This popup ignored the normal close. Click Close again to close it by reloading the quote page (any unsaved changes on the quote form would be lost), or use the X at the top right of this window to close without reloading. (Tried - " + outcomes.join("; ") + ")", "error");
-  }, 700);
-});
 
 try { if(window.self !== window.top) document.documentElement.classList.add("in-popup"); }
 catch(ignored){ document.documentElement.classList.add("in-popup"); }
