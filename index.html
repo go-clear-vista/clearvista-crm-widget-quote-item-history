@@ -35,9 +35,16 @@
 
     *{box-sizing:border-box}
 
+    html,body{height:100%}
+
+    /* One scrollbar only: the page itself never scrolls; the panel fills the
+       popup and the table takes the leftover height and scrolls inside it. */
     body{
       margin:0;
       padding:12px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
       background:linear-gradient(180deg,#f6f8fb 0%,#f3f6fb 100%);
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       color:var(--text);
@@ -51,9 +58,15 @@
       box-shadow:var(--shadow);
       overflow:hidden;
       margin:0 auto;
+      width:100%;
+      flex:1 1 auto;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
     }
 
     .header{
+      flex:0 0 auto;
       padding:18px 20px;
       border-bottom:1px solid var(--border);
     }
@@ -72,7 +85,13 @@
 
     .content{
       padding:16px;
+      flex:1 1 auto;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
     }
+
+    .content > *{flex:0 0 auto}
 
     .filters{
       display:grid;
@@ -316,7 +335,8 @@
       border:1px solid var(--border);
       border-radius:12px;
       overflow:auto;
-      max-height:min(64vh,640px);
+      flex:1 1 auto;
+      min-height:140px;
       background:#fff;
     }
 
@@ -534,6 +554,8 @@
       opacity:.7;
       cursor:default;
     }
+
+    .footer,.reference-text{flex:0 0 auto}
 
     .reference-text{
       font-size:11px;
@@ -1301,21 +1323,33 @@ el("closeBtn").addEventListener("click", function(){
   // here afterwards, say where the working close control is. closeReload is
   // deliberately not used: it would reload the quote form under the popup and
   // lose unsaved edits.
+  // Each attempt's outcome is recorded and, if the popup is still here, shown
+  // - so a failure says which routes were tried and what each returned.
+  var outcomes = [];
   var attempts = [
-    function(){ return ZOHO.CRM.UI.Popup.close(); },
-    function(){ window.parent.postMessage({ action: "close", type: "close", event: "close" }, "*"); },
-    function(){ window.close(); }
+    ["SDK close", function(){ return ZOHO.CRM.UI.Popup.close(); }],
+    ["postMessage", function(){
+      window.parent.postMessage({ action: "close", type: "close", event: "close" }, "*");
+      window.parent.postMessage(JSON.stringify({ action: "close", type: "close", event: "close" }), "*");
+    }],
+    ["window.close", function(){ window.close(); }]
   ];
   attempts.forEach(function(attempt){
+    var name = attempt[0];
     try {
-      var result = attempt();
-      if(result && typeof result.catch === "function"){
-        result.catch(function(error){ console.log("Popup close attempt failed:", error); });
+      var result = attempt[1]();
+      if(result && typeof result.then === "function"){
+        result.then(function(value){ outcomes.push(name + ": resolved " + JSON.stringify(value)); },
+                    function(error){ outcomes.push(name + ": rejected " + (error && error.message ? error.message : JSON.stringify(error))); });
+      } else {
+        outcomes.push(name + ": sent");
       }
-    } catch(error){ console.log("Popup close attempt threw:", error); }
+    } catch(error){
+      outcomes.push(name + ": threw " + (error && error.message ? error.message : error));
+    }
   });
   setTimeout(function(){
-    setStatus("The popup did not close from here - use the X at the top right of this window.", "error");
+    setStatus("The popup did not close from here - use the X at the top right of this window. (Tried - " + outcomes.join("; ") + ")", "error");
   }, 700);
 });
 

@@ -2,6 +2,19 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.6] - 2026-09-28
+
+### Fixed
+- **Double scrollbar.** The page scrolled inside the popup and the table
+  scrolled inside the page. The page no longer scrolls: the panel fills the
+  popup, the table takes the remaining height and is the only thing that
+  scrolls, and Close and the reference line stay pinned at the bottom. Checked in
+  headless Chromium at 1450x700: no page scroll, footer inside the viewport.
+- **Close button.** When the popup does not close, the message now lists each
+  route tried (SDK close, postMessage, window.close) and what it returned, so
+  the failure can be diagnosed rather than guessed at. The X in the popup header
+  still closes it.
+
 ## [1.8.5] - 2026-09-28
 
 ### Fixed
