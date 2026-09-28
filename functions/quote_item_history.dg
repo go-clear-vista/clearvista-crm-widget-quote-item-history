@@ -23,7 +23,7 @@ string automation.quote_item_history(String quote_id)
 	//   used to query the Quoted_Items subform module across all quotes. Deluge
 	//   requires a LITERAL connection link name on an invokeurl, so if the
 	//   connection is renamed, update all four invokeurl blocks below by hand.
-	// Analytics connection: "zoho_analytics" - needs scope
+	// Analytics connection: "zohoanalytics" - needs scope
 	//   ZohoAnalytics.data.read. Zoho Books sales orders and invoices are read
 	//   from the Analytics workspace that syncs from Books, not the Books API.
 	//   Also a LITERAL link name, on the three Analytics invokeurl blocks.
@@ -526,7 +526,7 @@ string automation.quote_item_history(String quote_id)
 							type :GET
 							parameters:createParams
 							headers:analyticsHeaders
-							connection:"zoho_analytics"
+							connection:"zohoanalytics"
 						];
 						jobId = "";
 						if(createResp.get("data") != null)
@@ -553,7 +553,7 @@ string automation.quote_item_history(String quote_id)
 								url :bulkBase + "/exportjobs/" + jobId
 								type :GET
 								headers:analyticsHeaders
-								connection:"zoho_analytics"
+								connection:"zohoanalytics"
 							];
 							statusData = statusResp.get("data");
 							jobCode = "";
@@ -582,7 +582,7 @@ string automation.quote_item_history(String quote_id)
 							url :bulkBase + "/exportjobs/" + jobId + "/data"
 							type :GET
 							headers:analyticsHeaders
-							connection:"zoho_analytics"
+							connection:"zohoanalytics"
 						];
 						csvLines = csvText.toString().toList("\n");
 						rowCount = 0;

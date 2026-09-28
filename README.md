@@ -249,7 +249,7 @@ Then set the two configuration constants at the top of `quote_item_history`:
 | Setting | Where | Purpose |
 | --- | --- | --- |
 | Connection link name | the `connection:` line of all three `invokeurl` blocks | A CRM connection carrying **`ZohoCRM.coql.READ`** (Setup → Developer Hub → Connections). Must be a literal. |
-| Analytics connection link name | the `connection:` line of the three Analytics `invokeurl` blocks | A connection carrying **`ZohoAnalytics.data.read`**, named `zoho_analytics`. Must be a literal. |
+| Analytics connection link name | the `connection:` line of the three Analytics `invokeurl` blocks | A connection carrying **`ZohoAnalytics.data.read`**, named `zohoanalytics`. Must be a literal. |
 | `ANALYTICS_ORG_ID`, `ANALYTICS_WORKSPACE_ID` | near the top of the function | The Analytics org and the workspace that syncs Books. Set either to `""` to launch with CRM quotes only; the widget will say so in its banner. |
 
 ### 3. Create the button
@@ -301,7 +301,7 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
 | Banner: "Sales quote history could not be loaded" | The connection named in the `invokeurl` blocks is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
 | Banner: "Zoho Books sales orders and invoices are not included" | `ANALYTICS_ORG_ID` or `ANALYTICS_WORKSPACE_ID` is empty in the function |
-| Banner: "... could not be requested from Analytics" | The `zoho_analytics` connection is missing or lacks `ZohoAnalytics.data.read`; the banner quotes Analytics' reply |
+| Banner: "... could not be requested from Analytics" | The `zohoanalytics` connection is missing or lacks `ZohoAnalytics.data.read`; the banner quotes Analytics' reply |
 | Table lacks recent orders/invoices | Analytics sync latency - Books documents appear after the next sync |
 | Table shows quotes but no orders/invoices | The CRM SKU has no matching Books item, or the Books item has no documents in the selected timeframe |
 | "No item history found" | None of this quote's products appear on any other document yet |
