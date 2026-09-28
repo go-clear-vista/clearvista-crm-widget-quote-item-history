@@ -142,11 +142,9 @@ string automation.quote_item_history(String quote_id)
 		}
 		else
 		{
+			// CRM_Quote_Number is the "SQ-101074" style number. Quote_Number is
+			// a long record-id-like value, so it is deliberately not a fallback.
 			quoteNumber = ifnull(quote.get("CRM_Quote_Number"),"").toString();
-			if(quoteNumber == "")
-			{
-				quoteNumber = ifnull(quote.get("Quote_Number"),quoteRecordId).toString();
-			}
 			if(quote.get("Account_Name") != null)
 			{
 				quoteAccount = ifnull(quote.get("Account_Name").get("name"),"").toString();
@@ -441,37 +439,48 @@ string automation.quote_item_history(String quote_id)
 		}
 		else
 		{
-			// SKUs to search for. CRM Product_Name == Product_Code == Books/Analytics Item Name.
+			// The Analytics "Item Name" is the Books SKU, which is the CRM
+			// Product_Code - NOT always the Product_Name (e.g. name "4-Series(R)
+			// Media Presentation Controller 102", code "MPC4-102-B"). Read the
+			// codes in one COQL call, and remember code -> CRM name so the rows
+			// carry the name the widget's Item Name checklist knows.
+			codeToName = Map();
 			skuClause = "";
-			for each productId in productIds
+			try
 			{
-				searchSku = ifnull(skuById.get(productId),"").toString();
-				if(searchSku == "")
+				codeCoql = "select id, Product_Name, Product_Code from Products where id in (" + idClause + ") limit 0, 200";
+				codeBody = Map();
+				codeBody.put("select_query",codeCoql);
+				codeResp = invokeurl
+				[
+					url :"https://www.zohoapis.com/crm/v7/coql"
+					type :POST
+					parameters:codeBody.toString()
+					connection:"crm_api_v21"
+				];
+				for each productRow in ifnull(codeResp.get("data"),List())
 				{
-					// No CRM history line supplied the SKU - read the product
-					// record so Analytics is still searched for it.
-					try
+					productName = ifnull(productRow.get("Product_Name"),"").toString();
+					searchSku = ifnull(productRow.get("Product_Code"),"").toString().trim();
+					if(searchSku == "")
 					{
-						productRecord = zoho.crm.getRecordById("Products",productId.toLong());
-						if(productRecord != null)
-						{
-							searchSku = ifnull(productRecord.get("Product_Code"),ifnull(productRecord.get("Product_Name"),"")).toString();
-						}
+						searchSku = productName.trim();
 					}
-					catch (e)
+					if(searchSku == "" || codeToName.containKey(searchSku.toLowerCase()))
 					{
-						searchSku = "";
+						continue;
 					}
+					codeToName.put(searchSku.toLowerCase(),productName);
+					if(skuClause != "")
+					{
+						skuClause = skuClause + ",";
+					}
+					skuClause = skuClause + "'" + searchSku.replaceAll("'","''") + "'";
 				}
-				if(searchSku == "")
-				{
-					continue;
-				}
-				if(skuClause != "")
-				{
-					skuClause = skuClause + ",";
-				}
-				skuClause = skuClause + "'" + searchSku.replaceAll("'","''") + "'";
+			}
+			catch (e)
+			{
+				warnings.add("Product codes could not be read, so Books history was not searched: " + e.toString());
 			}
 
 			booksModules = List();
@@ -509,10 +518,13 @@ string automation.quote_item_history(String quote_id)
 						jobConfig = Map();
 						jobConfig.put("sqlQuery",sqlText);
 						jobConfig.put("responseFormat","csv");
+						createParams = Map();
+						createParams.put("CONFIG",jobConfig.toString());
 						createResp = invokeurl
 						[
-							url :bulkBase + "/data?CONFIG=" + encodeUrl(jobConfig.toString())
+							url :bulkBase + "/data"
 							type :GET
+							parameters:createParams
 							headers:analyticsHeaders
 							connection:"zoho_analytics"
 						];
@@ -603,7 +615,7 @@ string automation.quote_item_history(String quote_id)
 							}
 
 							bookRow = Map();
-							bookRow.put("item_name",fields.get(0));
+							bookRow.put("item_name",ifnull(codeToName.get(fields.get(0).toString().toLowerCase()),fields.get(0)));
 							bookRow.put("description",fields.get(1).replaceAll("~",""));
 							bookRow.put("item_notes","");
 							bookRow.put("doc_type",docType);

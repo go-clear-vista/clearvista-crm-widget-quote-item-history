@@ -104,7 +104,27 @@ function collectProducts(rows) {
   return products;
 }
 
+// The quote's own number ("SQ-101074"), read live from the form. getRecord()
+// returns nothing on this layout, but a single field is often still readable.
+function readQuoteNumber() {
+  var names = ["CRM_Quote_Number", "Quote_Number"];
+  for (var i = 0; i < names.length; i++) {
+    try {
+      var field = ZDK.Page.getField(names[i]);
+      var value = field && field.getValue ? field.getValue() : "";
+      if (value && /^SQ-/i.test(String(value).trim())) {
+        console.log("CS: quote number from " + names[i] + ": " + value);
+        return String(value).trim();
+      }
+    } catch (err) {
+      console.log("CS: getField('" + names[i] + "') threw " + err);
+    }
+  }
+  return "";
+}
+
 try {
+  var quoteNumber = readQuoteNumber();
   var rows = readSubformRows();
   var products = collectProducts(rows);
   var rowIds = collectRowIds(rows);
@@ -129,6 +149,7 @@ try {
       data: {
         action: "item_history",
         quote_id: quoteId,
+        quote_number: quoteNumber,
         row_ids: rowIds.join(","),
         products: products,
         // Diagnostics, echoed by the widget if it still cannot proceed.
