@@ -505,29 +505,41 @@ string automation.quote_item_history(String quote_id)
 			monthNumbers.put("Nov","11");
 			monthNumbers.put("Dec","12");
 
-			// One comma-separated entry per document type: [docType, item view, item table, header view,
-			// header table, id column, number column, date column, status column,
-			// price column, discount column]
-			docSpecs = List();
-			docSpecs.add("Sales Order,2604071000000483529,Sales Order Items,2604071000000483102,Sales Orders,Sales order ID,Sales Order#,Order Date,Status,Item Price (BCY),Discount Amount (FCY)");
-			docSpecs.add("Sales Invoice,2604071000000006080,Invoice Items,2604071000000006079,Invoices,Invoice ID,Invoice Number,Invoice Date,Invoice Status,Item Price,Discount Amount (BCY)");
+			// Per document type: the Analytics views (item, header) and the column names.
+			// Assigned explicitly rather than unpacked from a list: list.get(n) on a
+			// split string was rejected by Deluge ("did not match ... [BIGINT]").
+			docTypeNames = List();
+			docTypeNames.add("Sales Order");
+			docTypeNames.add("Sales Invoice");
 
 			if(skuClause != "")
 			{
-				for each docSpec in docSpecs
+				for each docTypeName in docTypeNames
 				{
-					spec = docSpec.toList(",");
-					docType = spec.get(0);
-					itemView = spec.get(1);
-					itemTable = spec.get(2);
-					headerView = spec.get(3);
-					headerTable = spec.get(4);
-					idColumn = spec.get(5);
-					numberColumn = spec.get(6);
-					dateColumn = spec.get(7);
-					statusColumn = spec.get(8);
-					priceColumn = spec.get(9);
-					discountColumn = spec.get(10);
+					docType = docTypeName;
+					itemView = "2604071000000483529";
+					itemTable = "Sales Order Items";
+					headerView = "2604071000000483102";
+					headerTable = "Sales Orders";
+					idColumn = "Sales order ID";
+					numberColumn = "Sales Order#";
+					dateColumn = "Order Date";
+					statusColumn = "Status";
+					priceColumn = "Item Price (BCY)";
+					discountColumn = "Discount Amount (FCY)";
+					if(docTypeName == "Sales Invoice")
+					{
+						itemView = "2604071000000006080";
+						itemTable = "Invoice Items";
+						headerView = "2604071000000006079";
+						headerTable = "Invoices";
+						idColumn = "Invoice ID";
+						numberColumn = "Invoice Number";
+						dateColumn = "Invoice Date";
+						statusColumn = "Invoice Status";
+						priceColumn = "Item Price";
+						discountColumn = "Discount Amount (BCY)";
+					}
 					try
 					{
 						// 1. the line items for these SKUs
@@ -707,18 +719,14 @@ string automation.quote_item_history(String quote_id)
 							lineSku = ifnull(lineRow.get("Item Name"),"").toString();
 
 							docDate = "";
-							dateParts = ifnull(headerRow.get(dateColumn),"").toString().toList(" ");
-							if(dateParts.size() >= 3)
+							// "Aug 07, 2026 00:00:00" -> "2026-08-07" by fixed positions
+							dateText = ifnull(headerRow.get(dateColumn),"").toString().trim();
+							if(dateText.length() >= 12)
 							{
-								monthNumber = ifnull(monthNumbers.get(dateParts.get(0).toString()),"");
-								dayNumber = dateParts.get(1).toString().replaceAll(",","");
-								if(dayNumber.length() == 1)
-								{
-									dayNumber = "0" + dayNumber;
-								}
+								monthNumber = ifnull(monthNumbers.get(dateText.subString(0,3)),"");
 								if(monthNumber != "")
 								{
-									docDate = dateParts.get(2).toString() + "-" + monthNumber + "-" + dayNumber;
+									docDate = dateText.subString(8,12) + "-" + monthNumber + "-" + dateText.subString(4,6);
 								}
 							}
 

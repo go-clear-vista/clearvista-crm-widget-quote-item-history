@@ -2,6 +2,23 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.7] - 2026-09-28
+
+### Fixed
+- **Analytics read failed: "Data type of the argument of the function 'get' did
+  not match ... [BIGINT]".** The per-document settings were unpacked from a split
+  string with `list.get(n)`; they are now assigned explicitly, and the Books date
+  ("Aug 07, 2026 00:00:00") is converted by fixed character positions instead of
+  splitting it.
+- **Second scrollbar remained.** Zoho sizes the popup's iframe to the whole popup
+  but its title bar takes ~70px of that, so an iframe-tall page scrolled the popup.
+  Inside a popup the page is now 80px shorter than the iframe.
+
+### Added
+- The Client Script probes what the edit layout's page API returns (form fields,
+  id/record methods) and the banner reports it. URL and referrer reads are all
+  blocked in the sandbox, so the quote id needs another source.
+
 ## [1.8.6] - 2026-09-28
 
 ### Fixed

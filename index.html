@@ -37,6 +37,11 @@
 
     html,body{height:100%}
 
+    /* Zoho sizes the popup's iframe to the whole popup, but its own title bar
+       takes ~70px of that, so an iframe-tall page scrolls the popup (a second
+       scrollbar). Leave room for the title bar; a bare page has none. */
+    html.in-popup body{height:calc(100vh - 80px)}
+
     /* One scrollbar only: the page itself never scrolls; the panel fills the
        popup and the table takes the leftover height and scrolls inside it. */
     body{
@@ -1353,6 +1358,9 @@ el("closeBtn").addEventListener("click", function(){
   }, 700);
 });
 
+try { if(window.self !== window.top) document.documentElement.classList.add("in-popup"); }
+catch(ignored){ document.documentElement.classList.add("in-popup"); }
+
 renderHead();
 renderBody([]);
 
@@ -1428,6 +1436,17 @@ function findUrlsSeen(node, depth){
   for(var key in node){
     if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
     var found = findUrlsSeen(node[key], depth + 1);
+    if(found) return found;
+  }
+  return "";
+}
+
+function findStringKey(node, name, depth){
+  if(node === null || node === undefined || depth > 4 || typeof node !== "object") return "";
+  if(typeof node[name] === "string" && node[name]) return node[name].slice(0, 500);
+  for(var key in node){
+    if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    var found = findStringKey(node[key], name, depth + 1);
     if(found) return found;
   }
   return "";
@@ -1585,7 +1604,8 @@ async function onPageLoad(data){
     if(!recordId){
       clientNotes.push("The form did not supply a quote id" +
         " (row ids: " + rowIds.length + ", quote number: " + (number || "none") +
-        ", URLs seen by the script: " + (findUrlsSeen(data, 0) || "not sent - re-paste the Client Script") + "). " +
+        ", URLs seen by the script: " + (findUrlsSeen(data, 0) || "not sent - re-paste the Client Script") + "; " +
+        "page API: " + (findStringKey(data, "field_probe", 0) || "not sent") + "). " +
         "The quote number and account default need the quote id.");
     }
 

@@ -156,6 +156,39 @@ function readQuoteIdFromUrl() {
 }
 
 // Form fields the widget can fall back on when no quote id is available.
+// What this layout's page API will actually give us - reported in the widget's
+// banner so the next step is chosen from evidence, not guesses.
+var fieldProbe = "";
+function probePageApi() {
+  var notes = [];
+  var names = ["CRM_Quote_Number", "Quote_Number", "Subject", "Account_Name", "Deal_Name", "Quote_Stage"];
+  for (var i = 0; i < names.length; i++) {
+    try {
+      var field = ZDK.Page.getField(names[i]);
+      if (!field) { notes.push(names[i] + "=none"); continue; }
+      var value = field.getValue ? field.getValue() : "(no getValue)";
+      var text = value && typeof value === "object" ? JSON.stringify(value) : String(value);
+      notes.push(names[i] + "=" + text.slice(0, 60));
+    } catch (err) {
+      notes.push(names[i] + "=threw " + String(err).slice(0, 50));
+    }
+  }
+  var methods = ["getRecordId", "getEntityId", "getId", "getRecord", "getModule", "getUrl", "getMode"];
+  for (var m = 0; m < methods.length; m++) {
+    try {
+      if (typeof ZDK.Page[methods[m]] === "function") {
+        var result = ZDK.Page[methods[m]]();
+        var out = result && typeof result === "object" ? JSON.stringify(result) : String(result);
+        notes.push(methods[m] + "()=" + out.slice(0, 60));
+      }
+    } catch (err) {
+      notes.push(methods[m] + "() threw");
+    }
+  }
+  fieldProbe = notes.join(" ; ");
+  console.log("CS: page API probe: " + fieldProbe);
+}
+
 function readAccountName() {
   try {
     var field = ZDK.Page.getField("Account_Name");
@@ -171,6 +204,7 @@ function readAccountName() {
 try {
   var quoteNumber = readQuoteNumber();
   var accountName = readAccountName();
+  probePageApi();
   var rows = readSubformRows();
   var products = collectProducts(rows);
   var rowIds = collectRowIds(rows);
@@ -203,6 +237,7 @@ try {
         row_keys: rowKeys,
         urls_seen: urlsSeen || "not probed (a subform row supplied the parent id)",
         account_name: accountName,
+        field_probe: fieldProbe,
       },
       wait: true,
     },
