@@ -10,6 +10,11 @@ All notable changes to this widget will be documented in this file.
   using `Product_Name` (e.g. "4-Series(R) Media Presentation Controller 102" is
   `MPC4-102-B`). Codes are now read from Products, and Books rows are labelled
   with the CRM product name so the Item Name filter still matches them.
+- The Client Script also reads the quote's record id from the CRM page URL
+  (`.../tab/Quotes/<id>/edit`) when no subform row exposes a parent id. With the
+  id the backend reads the quote itself, which supplies `CRM_Quote_Number` and
+  the account for the default Account filter. A new, unsaved quote has no id in
+  its URL and still shows "-".
 - The Analytics export request now passes `CONFIG` as a parameter instead of a
   hand-built URL.
 - **Footer quote number.** The Client Script now reads `CRM_Quote_Number` from
