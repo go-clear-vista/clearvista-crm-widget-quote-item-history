@@ -2,6 +2,19 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.3] - 2026-09-28
+
+### Changed
+- Diagnostics, because the quote number and Books rows still failed silently:
+  - The banner now says when Analytics returns no sales-order / invoice lines,
+    naming the SKUs searched.
+  - When the form supplies no quote id, the banner says so and echoes the page
+    URLs the Client Script inspected (`urls_seen`).
+- **Close button.** It calls the SDK close, then tries `postMessage` and
+  `window.close`, and if the popup is still open after 0.7s points at the X in
+  the popup header. `closeReload` is avoided because it would reload the quote
+  form and drop unsaved edits.
+
 ## [1.8.2] - 2026-09-28
 
 ### Fixed

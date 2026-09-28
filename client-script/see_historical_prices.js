@@ -126,12 +126,15 @@ function readQuoteNumber() {
 // The quote's record id from the CRM page URL, which is the one thing the
 // layout always exposes: .../tab/Quotes/<id>/edit?layoutId=... An unsaved
 // new quote or clone has no id in its URL, and correctly yields "".
+var urlsSeen = [];
+
 function readQuoteIdFromUrl() {
   var candidates = [];
   try { candidates.push(window.location.href); } catch (err) {}
   try { candidates.push(window.top.location.href); } catch (err) {}
   try { candidates.push(document.location.href); } catch (err) {}
   try { candidates.push(document.referrer); } catch (err) {}
+  urlsSeen = candidates;
   for (var i = 0; i < candidates.length; i++) {
     var match = /\/tab\/Quotes\/(\d{8,})/.exec(String(candidates[i] || ""));
     if (match) {
@@ -175,6 +178,7 @@ try {
         // Diagnostics, echoed by the widget if it still cannot proceed.
         row_count: rows.length,
         row_keys: rowKeys,
+        urls_seen: urlsSeen.join(" | "),
       },
       wait: true,
     },

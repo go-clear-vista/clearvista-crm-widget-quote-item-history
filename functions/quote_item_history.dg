@@ -650,6 +650,12 @@ string automation.quote_item_history(String quote_id)
 							rows.add(bookRow);
 							rowCount = rowCount + 1;
 						}
+						if(rowCount == 0)
+						{
+							// Say so rather than showing a silent nothing: which SKUs were
+							// searched tells us whether Analytics simply has no such lines.
+							warnings.add("Analytics returned no " + docType.toLowerCase() + " lines for: " + skuClause.replaceAll("'","") + ". Reply started: " + csvString.subString(0,80));
+						}
 						if(rowCount >= MAX_ANALYTICS_ROWS)
 						{
 							warnings.add("Only the " + MAX_ANALYTICS_ROWS + " most recent " + docType.toLowerCase() + " lines were read from Analytics.");

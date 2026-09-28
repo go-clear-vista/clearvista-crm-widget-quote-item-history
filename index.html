@@ -1238,7 +1238,7 @@ function applyPayload(payload){
     note.textContent = "";
   }
 
-  setWarning(payload.warnings);
+  setWarning((payload.warnings || []).concat(clientNotes));
   render();
 }
 
@@ -1294,8 +1294,27 @@ function resizePopup(){
 }
 
 el("closeBtn").addEventListener("click", function(){
-  try { ZOHO.CRM.UI.Popup.close(); }
-  catch(error){ try { window.close(); } catch(ignored){} }
+  // Popups opened by a Client Script (ZDK.Client.openPopup) can ignore the
+  // SDK close on some builds, so try each route and, if the popup is still
+  // here afterwards, say where the working close control is. closeReload is
+  // deliberately not used: it would reload the quote form under the popup and
+  // lose unsaved edits.
+  var attempts = [
+    function(){ return ZOHO.CRM.UI.Popup.close(); },
+    function(){ window.parent.postMessage({ action: "close", type: "close", event: "close" }, "*"); },
+    function(){ window.close(); }
+  ];
+  attempts.forEach(function(attempt){
+    try {
+      var result = attempt();
+      if(result && typeof result.catch === "function"){
+        result.catch(function(error){ console.log("Popup close attempt failed:", error); });
+      }
+    } catch(error){ console.log("Popup close attempt threw:", error); }
+  });
+  setTimeout(function(){
+    setStatus("The popup did not close from here - use the X at the top right of this window.", "error");
+  }, 700);
 });
 
 renderHead();
@@ -1353,6 +1372,19 @@ function findRecordId(node, depth){
 }
 
 // Quoted_Items row ids, sent by the Client Script from the subform.
+var clientNotes = [];
+
+function findUrlsSeen(node, depth){
+  if(node === null || node === undefined || depth > 4 || typeof node !== "object") return "";
+  if(node.urls_seen) return String(node.urls_seen).slice(0, 300);
+  for(var key in node){
+    if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    var found = findUrlsSeen(node[key], depth + 1);
+    if(found) return found;
+  }
+  return "";
+}
+
 function findRowIds(node, depth){
   if(node === null || node === undefined || depth > 4) return [];
 
@@ -1498,6 +1530,15 @@ async function onPageLoad(data){
                                      .filter(function(id){ return /^\d{6,}$/.test(id); });
     suppliedProductNames = (products || []).map(function(p){ return p.name ? String(p.name) : ""; })
                                            .filter(function(name){ return !!name; });
+
+    // Diagnostics for the banner: what the form actually supplied.
+    clientNotes = [];
+    if(!recordId){
+      clientNotes.push("The form did not supply a quote id" +
+        " (row ids: " + rowIds.length + ", quote number: " + (number || "none") +
+        ", URLs seen by the script: " + (findUrlsSeen(data, 0) || "not sent - re-paste the Client Script") + "). " +
+        "The quote number and account default need the quote id.");
+    }
 
     if(!recordId && !rowIds.length && !productIds.length){
       var seen = "";
