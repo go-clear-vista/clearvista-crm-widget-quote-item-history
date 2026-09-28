@@ -1203,9 +1203,11 @@ function applyPayload(payload){
     if(!accountSeen[name]){ accountSeen[name] = true; accountNames.push(name); }
   });
 
+  // The backend supplies the quote's account; when it could not read the
+  // quote, fall back to the account name the form itself reported.
   var current = payload.quote && payload.quote.account_name
     ? String(payload.quote.account_name).trim()
-    : "";
+    : String(formAccountName || "").trim();
 
   // Does this quote's account actually appear in the history?
   var currentHasHistory = !!(current && accountSeen[current]);
@@ -1373,6 +1375,18 @@ function findRecordId(node, depth){
 
 // Quoted_Items row ids, sent by the Client Script from the subform.
 var clientNotes = [];
+var formAccountName = "";
+
+function findFormAccountName(node, depth){
+  if(node === null || node === undefined || depth > 4 || typeof node !== "object") return "";
+  if(typeof node.account_name === "string" && node.account_name.trim()) return node.account_name.trim();
+  for(var key in node){
+    if(!Object.prototype.hasOwnProperty.call(node, key)) continue;
+    var found = findFormAccountName(node[key], depth + 1);
+    if(found) return found;
+  }
+  return "";
+}
 
 function findUrlsSeen(node, depth){
   if(node === null || node === undefined || depth > 4 || typeof node !== "object") return "";
@@ -1533,6 +1547,7 @@ async function onPageLoad(data){
 
     // Diagnostics for the banner: what the form actually supplied.
     clientNotes = [];
+    formAccountName = findFormAccountName(data, 0);
     if(!recordId){
       clientNotes.push("The form did not supply a quote id" +
         " (row ids: " + rowIds.length + ", quote number: " + (number || "none") +

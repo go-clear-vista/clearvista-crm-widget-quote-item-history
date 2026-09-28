@@ -425,14 +425,9 @@ string automation.quote_item_history(String quote_id)
 
 		// ---- 4. Zoho Books sales orders and invoices, via Zoho Analytics ----
 		// Books data is read from the Analytics workspace that syncs from Books
-		// rather than from the Books API: two SQL queries replace the hundreds of
-		// per-item / per-document Books calls, and the data is only as stale as
-		// the Analytics sync (acceptable for Books documents; CRM stays live).
-		// Each query returns ONE column, "line", built with concat_ws('|', ...):
-		// that yields raw numbers and ISO dates (the plain columns come back as
-		// text such as "USD 5,775.00"), and it avoids parsing quoted CSV. Empty
-		// text is coalesced to "~" because concat_ws would otherwise skip NULLs
-		// and shift every later field.
+		// rather than from the Books API: a handful of small reads replace the
+		// hundreds of per-item / per-document Books calls, and the data is only as
+		// stale as the Analytics sync (acceptable for Books documents; CRM stays live).
 		if(ANALYTICS_ORG_ID == "" || ANALYTICS_WORKSPACE_ID == "")
 		{
 			warnings.add("Zoho Books sales orders and invoices are not included: set ANALYTICS_ORG_ID and ANALYTICS_WORKSPACE_ID in the quote_item_history function.");
@@ -483,173 +478,292 @@ string automation.quote_item_history(String quote_id)
 				warnings.add("Product codes could not be read, so Books history was not searched: " + e.toString());
 			}
 
-			booksModules = List();
-			booksModules.add("SalesOrders");
-			booksModules.add("Invoices");
-
-			// The two documents differ only in table and column names. Analytics
-			// SQL wants the double-quoted display names.
-			textCols = "replace(replace(replace(replace(coalesce(i.\"Description\",'~'), '|', '/'), '\"', ''''''), char(13), ' '), char(10), ' ')";
-			customerCol = "coalesce(replace(c.\"Customer Name\", '|', '/'),'~')";
-			salesOrderSql = "select concat_ws('|', i.\"Item Name\", " + textCols + ", coalesce(cast(h.\"Sales Order#\" as varchar),'~'), h.\"Order Date\", coalesce(h.\"Status\",'~'), " + customerCol + ", coalesce(i.\"Quantity\",0), coalesce(i.\"Item Price (BCY)\",0), coalesce(i.\"Discount Amount (FCY)\",0), coalesce(i.\"Sub Total (BCY)\",0), coalesce(i.\"Total (BCY)\",0)) as line from \"Sales Order Items\" i join \"Sales Orders\" h on i.\"Sales order ID\" = h.\"Sales order ID\" left join \"Customers\" c on c.\"Customer ID\" = h.\"Customer ID\" where i.\"Item Name\" in (" + skuClause + ") order by h.\"Order Date\" desc limit 0, " + MAX_ANALYTICS_ROWS;
-			invoiceSql = "select concat_ws('|', i.\"Item Name\", " + textCols + ", coalesce(cast(h.\"Invoice Number\" as varchar),'~'), h.\"Invoice Date\", coalesce(h.\"Invoice Status\",'~'), " + customerCol + ", coalesce(i.\"Quantity\",0), coalesce(i.\"Item Price\",0), coalesce(i.\"Discount Amount (BCY)\",0), coalesce(i.\"Sub Total (BCY)\",0), coalesce(i.\"Total (BCY)\",0)) as line from \"Invoice Items\" i join \"Invoices\" h on i.\"Invoice ID\" = h.\"Invoice ID\" left join \"Customers\" c on c.\"Customer ID\" = h.\"Customer ID\" where i.\"Item Name\" in (" + skuClause + ") order by h.\"Invoice Date\" desc limit 0, " + MAX_ANALYTICS_ROWS;
-
+			// Analytics' synchronous export API is used, NOT the bulk (SQL) export:
+			// bulk jobs are queued and can sit at "not initiated" for minutes, far
+			// longer than a widget call can wait, whereas the synchronous export
+			// answers in about a second. It cannot join, so each document type is
+			// three small reads joined here: the line items by SKU, then the
+			// headers for just those documents, then the customer names.
+			// Values come back as text ("USD 1,049.00", "Aug 07, 2026 00:00:00"),
+			// so amounts and dates are parsed below.
 			analyticsHeaders = Map();
 			analyticsHeaders.put("ZANALYTICS-ORGID",ANALYTICS_ORG_ID);
-			bulkBase = "https://analyticsapi.zoho.com/restapi/v2/bulk/workspaces/" + ANALYTICS_WORKSPACE_ID;
+			viewBase = "https://analyticsapi.zoho.com/restapi/v2/workspaces/" + ANALYTICS_WORKSPACE_ID + "/views/";
+			customerView = "2604071000000006076";
 
-			// Deluge has no while loop, so poll a fixed number of times.
-			pollAttempts = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30".toList(",");
+			monthNumbers = Map();
+			monthNumbers.put("Jan","01");
+			monthNumbers.put("Feb","02");
+			monthNumbers.put("Mar","03");
+			monthNumbers.put("Apr","04");
+			monthNumbers.put("May","05");
+			monthNumbers.put("Jun","06");
+			monthNumbers.put("Jul","07");
+			monthNumbers.put("Aug","08");
+			monthNumbers.put("Sep","09");
+			monthNumbers.put("Oct","10");
+			monthNumbers.put("Nov","11");
+			monthNumbers.put("Dec","12");
+
+			// One comma-separated entry per document type: [docType, item view, item table, header view,
+			// header table, id column, number column, date column, status column,
+			// price column, discount column]
+			docSpecs = List();
+			docSpecs.add("Sales Order,2604071000000483529,Sales Order Items,2604071000000483102,Sales Orders,Sales order ID,Sales Order#,Order Date,Status,Item Price (BCY),Discount Amount (FCY)");
+			docSpecs.add("Sales Invoice,2604071000000006080,Invoice Items,2604071000000006079,Invoices,Invoice ID,Invoice Number,Invoice Date,Invoice Status,Item Price,Discount Amount (BCY)");
 
 			if(skuClause != "")
 			{
-				for each booksModule in booksModules
+				for each docSpec in docSpecs
 				{
-					docType = "Sales Order";
-					sqlText = salesOrderSql;
-					if(booksModule == "Invoices")
-					{
-						docType = "Sales Invoice";
-						sqlText = invoiceSql;
-					}
+					spec = docSpec.toList(",");
+					docType = spec.get(0);
+					itemView = spec.get(1);
+					itemTable = spec.get(2);
+					headerView = spec.get(3);
+					headerTable = spec.get(4);
+					idColumn = spec.get(5);
+					numberColumn = spec.get(6);
+					dateColumn = spec.get(7);
+					statusColumn = spec.get(8);
+					priceColumn = spec.get(9);
+					discountColumn = spec.get(10);
 					try
 					{
-						// 1. create the export job
-						jobConfig = Map();
-						jobConfig.put("sqlQuery",sqlText);
-						jobConfig.put("responseFormat","csv");
-						createParams = Map();
-						createParams.put("CONFIG",jobConfig.toString());
-						createResp = invokeurl
+						// 1. the line items for these SKUs
+						lineColumns = List();
+						lineColumns.add(idColumn);
+						lineColumns.add("Item Name");
+						lineColumns.add("Description");
+						lineColumns.add("Quantity");
+						lineColumns.add(priceColumn);
+						lineColumns.add(discountColumn);
+						lineColumns.add("Sub Total (BCY)");
+						lineColumns.add("Total (BCY)");
+						lineConfig = Map();
+						lineConfig.put("responseFormat","json");
+						lineConfig.put("selectedColumns",lineColumns);
+						lineConfig.put("criteria","\"" + itemTable + "\".\"Item Name\" in (" + skuClause + ")");
+						lineParams = Map();
+						lineParams.put("CONFIG",lineConfig.toString());
+						lineResp = invokeurl
 						[
-							url :bulkBase + "/data"
+							url :viewBase + itemView + "/data"
 							type :GET
-							parameters:createParams
+							parameters:lineParams
 							headers:analyticsHeaders
 							connection:"zohoanalytics"
 						];
-						jobId = "";
-						if(createResp.get("data") != null)
+						lineNode = lineResp.get("data");
+						if(lineNode != null && lineNode.toString().startsWith("{"))
 						{
-							jobId = ifnull(createResp.get("data").get("jobId"),"").toString();
+							lineNode = lineNode.get("data");
 						}
-						if(jobId == "")
+						if(lineNode == null)
 						{
-							warnings.add(docType + " history could not be requested from Analytics. Analytics replied: " + createResp.toString());
+							warnings.add(docType + " lines could not be read from Analytics. Analytics replied: " + lineResp.toString());
+							continue;
+						}
+						lineList = lineNode;
+						if(lineList.size() == 0)
+						{
 							continue;
 						}
 
-						// 2. fetch the result, retrying until it is ready. The job-status
-						// endpoint is not trusted: it can keep reporting 1001 "not
-						// initiated" while the data is already downloadable, so the
-						// download itself is the readiness test. Until the job is ready
-						// the endpoint answers with a JSON error object ("{..."), and once
-						// ready it answers with the CSV, which never starts with "{".
-						csvText = "";
-						csvReady = false;
-						lastReply = "";
-						for each pollAttempt in pollAttempts
+						// 2. headers for just those documents, in batches of 100
+						docIds = List();
+						for each lineRow in lineList
 						{
-							if(csvReady)
+							lineDocId = ifnull(lineRow.get(idColumn),"").toString();
+							if(lineDocId != "" && !docIds.contains(lineDocId))
 							{
-								continue;
-							}
-							downloadResp = invokeurl
-							[
-								url :bulkBase + "/exportjobs/" + jobId + "/data"
-								type :GET
-								headers:analyticsHeaders
-								connection:"zohoanalytics"
-							];
-							lastReply = ifnull(downloadResp,"").toString();
-							if(lastReply.trim().length() > 3 && !lastReply.trim().startsWith("{"))
-							{
-								csvText = lastReply;
-								csvReady = true;
+								docIds.add(lineDocId);
 							}
 						}
-						if(!csvReady)
+						headerById = Map();
+						customerIds = List();
+						idBatch = List();
+						idSeen = 0;
+						for each docId in docIds
 						{
-							warnings.add(docType + " history from Analytics was not ready after " + pollAttempts.size() + " tries. Last reply: " + lastReply);
-							continue;
-						}
-
-						// 3. parse the CSV: header line, then one quoted line per row
-						// Strip the CSV's own quoting up front: the SQL already turned every
-						// double quote in the data into '' , so any " left is CSV wrapping.
-						// toList() can choke on quoted text, so split only after this.
-						csvString = ifnull(csvText,"").toString();
-						csvString = csvString.replaceAll("\"","");
-						csvString = csvString.replaceAll("\r","");
-						if(csvString.length() < 5)
-						{
-							warnings.add(docType + " history: Analytics returned no rows. Reply started: " + csvString);
-						}
-						csvLines = List();
-						try
-						{
-							csvLines = csvString.toList("\n");
-						}
-						catch (splitError)
-						{
-							warnings.add(docType + " history: the Analytics reply could not be split into lines (" + splitError.toString() + "). Reply started: " + csvString.subString(0,120));
-							continue;
-						}
-						rowCount = 0;
-						for each csvLine in csvLines
-						{
-							cleanLine = csvLine.replaceAll("\r","").trim();
-							if(cleanLine.startsWith("\"") && cleanLine.endsWith("\"") && cleanLine.length() >= 2)
+							idBatch.add(docId);
+							idSeen = idSeen + 1;
+							if(idBatch.size() == 100 || idSeen == docIds.size())
 							{
-								cleanLine = cleanLine.subString(1,cleanLine.length() - 1);
-							}
-							fields = cleanLine.toList("|");
-							if(fields.size() != 11)
-							{
-								// the header row and blank lines have no "|"; anything else is malformed
-								if(cleanLine.contains("|"))
+								headerColumns = List();
+								headerColumns.add(idColumn);
+								headerColumns.add(numberColumn);
+								headerColumns.add(dateColumn);
+								headerColumns.add(statusColumn);
+								headerColumns.add("Customer ID");
+								headerConfig = Map();
+								headerConfig.put("responseFormat","json");
+								headerConfig.put("selectedColumns",headerColumns);
+								idJoined = "";
+								for each batchDocId in idBatch
 								{
-									warnings.add("Skipped a malformed " + docType.toLowerCase() + " row from Analytics.");
+									if(idJoined != "")
+									{
+										idJoined = idJoined + ",";
+									}
+									idJoined = idJoined + batchDocId;
 								}
-								continue;
+								headerConfig.put("criteria","\"" + headerTable + "\".\"" + idColumn + "\" in (" + idJoined + ")");
+								headerParams = Map();
+								headerParams.put("CONFIG",headerConfig.toString());
+								headerResp = invokeurl
+								[
+									url :viewBase + headerView + "/data"
+									type :GET
+									parameters:headerParams
+									headers:analyticsHeaders
+									connection:"zohoanalytics"
+								];
+								headerNode = headerResp.get("data");
+								if(headerNode != null && headerNode.toString().startsWith("{"))
+								{
+									headerNode = headerNode.get("data");
+								}
+								if(headerNode == null)
+								{
+									warnings.add(docType + " headers could not be read from Analytics. Analytics replied: " + headerResp.toString());
+								}
+								for each headerRow in ifnull(headerNode,List())
+								{
+									headerId = ifnull(headerRow.get(idColumn),"").toString();
+									if(headerId != "")
+									{
+										headerById.put(headerId,headerRow);
+										headerCustomer = ifnull(headerRow.get("Customer ID"),"").toString();
+										if(headerCustomer != "" && !customerIds.contains(headerCustomer))
+										{
+											customerIds.add(headerCustomer);
+										}
+									}
+								}
+								idBatch = List();
 							}
-							quantity = ifnull(fields.get(6),"0").toDecimal();
-							rate = ifnull(fields.get(7),"0").toDecimal();
-							discountAmount = ifnull(fields.get(8),"0").toDecimal();
-							grossTotal = ifnull(fields.get(9),"0").toDecimal();
-							itemTotal = ifnull(fields.get(10),"0").toDecimal();
-							docDate = fields.get(3).toString();
-							if(docDate.length() >= 10)
+						}
+
+						// 3. customer names, in batches of 100
+						nameById = Map();
+						customerBatch = List();
+						customerSeen = 0;
+						for each customerId in customerIds
+						{
+							customerBatch.add(customerId);
+							customerSeen = customerSeen + 1;
+							if(customerBatch.size() == 100 || customerSeen == customerIds.size())
 							{
-								docDate = docDate.subString(0,10);
+								customerColumns = List();
+								customerColumns.add("Customer ID");
+								customerColumns.add("Customer Name");
+								customerConfig = Map();
+								customerConfig.put("responseFormat","json");
+								customerConfig.put("selectedColumns",customerColumns);
+								customerJoined = "";
+								for each batchCustomerId in customerBatch
+								{
+									if(customerJoined != "")
+									{
+										customerJoined = customerJoined + ",";
+									}
+									customerJoined = customerJoined + batchCustomerId;
+								}
+								customerConfig.put("criteria","\"Customers\".\"Customer ID\" in (" + customerJoined + ")");
+								customerParams = Map();
+								customerParams.put("CONFIG",customerConfig.toString());
+								customerResp = invokeurl
+								[
+									url :viewBase + customerView + "/data"
+									type :GET
+									parameters:customerParams
+									headers:analyticsHeaders
+									connection:"zohoanalytics"
+								];
+								customerNode = customerResp.get("data");
+								if(customerNode != null && customerNode.toString().startsWith("{"))
+								{
+									customerNode = customerNode.get("data");
+								}
+								for each customerRow in ifnull(customerNode,List())
+								{
+									nameById.put(ifnull(customerRow.get("Customer ID"),"").toString(),ifnull(customerRow.get("Customer Name"),"").toString());
+								}
+								customerBatch = List();
+							}
+						}
+
+						// 4. assemble the rows
+						rowCount = 0;
+						for each lineRow in lineList
+						{
+							if(rowCount >= MAX_ANALYTICS_ROWS)
+							{
+								warnings.add("Only the first " + MAX_ANALYTICS_ROWS + " " + docType.toLowerCase() + " lines were read from Analytics.");
+								break;
+							}
+							headerRow = ifnull(headerById.get(ifnull(lineRow.get(idColumn),"").toString()),Map());
+							lineSku = ifnull(lineRow.get("Item Name"),"").toString();
+
+							docDate = "";
+							dateParts = ifnull(headerRow.get(dateColumn),"").toString().toList(" ");
+							if(dateParts.size() >= 3)
+							{
+								monthNumber = ifnull(monthNumbers.get(dateParts.get(0).toString()),"");
+								dayNumber = dateParts.get(1).toString().replaceAll(",","");
+								if(dayNumber.length() == 1)
+								{
+									dayNumber = "0" + dayNumber;
+								}
+								if(monthNumber != "")
+								{
+									docDate = dateParts.get(2).toString() + "-" + monthNumber + "-" + dayNumber;
+								}
+							}
+
+							quantityText = ifnull(lineRow.get("Quantity"),"0").toString().replaceAll("[^0-9.-]","");
+							priceText = ifnull(lineRow.get(priceColumn),"0").toString().replaceAll("[^0-9.-]","");
+							discountText = ifnull(lineRow.get(discountColumn),"0").toString().replaceAll("[^0-9.-]","");
+							grossText = ifnull(lineRow.get("Sub Total (BCY)"),"0").toString().replaceAll("[^0-9.-]","");
+							netText = ifnull(lineRow.get("Total (BCY)"),"0").toString().replaceAll("[^0-9.-]","");
+							if(quantityText == "")
+							{
+								quantityText = "0";
+							}
+							if(priceText == "")
+							{
+								priceText = "0";
+							}
+							if(discountText == "")
+							{
+								discountText = "0";
+							}
+							if(grossText == "")
+							{
+								grossText = "0";
+							}
+							if(netText == "")
+							{
+								netText = "0";
 							}
 
 							bookRow = Map();
-							bookRow.put("item_name",ifnull(codeToName.get(fields.get(0).toString().toLowerCase()),fields.get(0)));
-							bookRow.put("description",fields.get(1).replaceAll("~",""));
+							bookRow.put("item_name",ifnull(codeToName.get(lineSku.toLowerCase()),lineSku));
+							bookRow.put("description",ifnull(lineRow.get("Description"),""));
 							bookRow.put("item_notes","");
 							bookRow.put("doc_type",docType);
-							bookRow.put("doc_number",fields.get(2));
+							bookRow.put("doc_number",ifnull(headerRow.get(numberColumn),""));
 							bookRow.put("date",docDate);
-							bookRow.put("account_name",fields.get(5).replaceAll("~",""));
-							bookRow.put("status",fields.get(4).replaceAll("~",""));
-							bookRow.put("quantity",quantity);
-							bookRow.put("item_price",rate);
-							bookRow.put("discount",discountAmount);
-							bookRow.put("line_total",grossTotal);
-							bookRow.put("total_after_discount",itemTotal);
+							bookRow.put("account_name",ifnull(nameById.get(ifnull(headerRow.get("Customer ID"),"").toString()),""));
+							bookRow.put("status",ifnull(headerRow.get(statusColumn),""));
+							bookRow.put("quantity",quantityText.toDecimal());
+							bookRow.put("item_price",priceText.toDecimal());
+							bookRow.put("discount",discountText.toDecimal());
+							bookRow.put("line_total",grossText.toDecimal());
+							bookRow.put("total_after_discount",netText.toDecimal());
 							rows.add(bookRow);
 							rowCount = rowCount + 1;
-						}
-						if(rowCount == 0)
-						{
-							// Say so rather than showing a silent nothing: which SKUs were
-							// searched tells us whether Analytics simply has no such lines.
-							warnings.add("Analytics returned no " + docType.toLowerCase() + " lines for: " + skuClause.replaceAll("'","") + ". Reply started: " + csvString.subString(0,80));
-						}
-						if(rowCount >= MAX_ANALYTICS_ROWS)
-						{
-							warnings.add("Only the " + MAX_ANALYTICS_ROWS + " most recent " + docType.toLowerCase() + " lines were read from Analytics.");
 						}
 					}
 					catch (e)

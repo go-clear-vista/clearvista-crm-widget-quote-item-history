@@ -167,10 +167,10 @@ The backend gathers data from two places:
 1. **CRM sales quotes** - a COQL query against the `Quoted_Items` subform module for
    every product on the current quote, then a second COQL query for the parent quote
    headers (number, account, stage, document date).
-2. **Zoho Books, via Zoho Analytics** - two SQL queries against the "Zoho Analytics
-   All" workspace (which syncs from Books) join `Sales Order Items` / `Invoice Items`
-   to their header tables and `Customers`, filtered by the quote's SKUs. Each runs as
-   an Analytics bulk-export job (create, poll, download). No Books API calls are made,
+2. **Zoho Books, via Zoho Analytics** - synchronous JSON exports from the "Zoho Analytics
+   All" workspace (which syncs from Books): `Sales Order Items` / `Invoice Items` by the
+   quote's SKUs, then just those documents' headers, then `Customers`, joined in the
+   function. (Bulk SQL export jobs were tried and rejected: they queue for minutes.) No Books API calls are made,
    so this is fast and uses no Books API quota; the trade-off is Analytics sync latency.
 
 Failures are non-fatal and surfaced in a "Heads up" banner: if the Books side is not
@@ -321,6 +321,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.8.4
+- **Version**: 1.8.5
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

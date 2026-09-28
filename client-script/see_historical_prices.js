@@ -126,28 +126,51 @@ function readQuoteNumber() {
 // The quote's record id from the CRM page URL, which is the one thing the
 // layout always exposes: .../tab/Quotes/<id>/edit?layoutId=... An unsaved
 // new quote or clone has no id in its URL, and correctly yields "".
-var urlsSeen = [];
+var urlsSeen = "";
 
+// Every route is tried and its outcome recorded, so the widget's banner can
+// say exactly what this sandbox allowed instead of reporting nothing.
 function readQuoteIdFromUrl() {
-  var candidates = [];
-  try { candidates.push(window.location.href); } catch (err) {}
-  try { candidates.push(window.top.location.href); } catch (err) {}
-  try { candidates.push(document.location.href); } catch (err) {}
-  try { candidates.push(document.referrer); } catch (err) {}
-  urlsSeen = candidates;
-  for (var i = 0; i < candidates.length; i++) {
-    var match = /\/tab\/Quotes\/(\d{8,})/.exec(String(candidates[i] || ""));
-    if (match) {
-      console.log("CS: quote id from URL: " + match[1]);
-      return match[1];
+  var probes = [
+    ["location", function () { return window.location.href; }],
+    ["top", function () { return window.top.location.href; }],
+    ["document", function () { return document.location.href; }],
+    ["referrer", function () { return document.referrer; }],
+  ];
+  var notes = [];
+  var found = "";
+  for (var i = 0; i < probes.length; i++) {
+    var value = "";
+    try {
+      value = String(probes[i][1]() || "");
+      notes.push(probes[i][0] + "=" + (value ? value.slice(0, 90) : "empty"));
+    } catch (err) {
+      notes.push(probes[i][0] + "=blocked");
     }
+    var match = /\/tab\/Quotes\/(\d{8,})/.exec(value);
+    if (match && !found) found = match[1];
   }
-  console.log("CS: no quote id in the page URL (" + candidates.join(" | ") + ")");
+  urlsSeen = notes.join(" ; ");
+  console.log("CS: URL probes: " + urlsSeen + " -> quote id '" + found + "'");
+  return found;
+}
+
+// Form fields the widget can fall back on when no quote id is available.
+function readAccountName() {
+  try {
+    var field = ZDK.Page.getField("Account_Name");
+    var value = field && field.getValue ? field.getValue() : null;
+    if (value && value.name) return String(value.name);
+    if (typeof value === "string") return value;
+  } catch (err) {
+    console.log("CS: getField('Account_Name') threw " + err);
+  }
   return "";
 }
 
 try {
   var quoteNumber = readQuoteNumber();
+  var accountName = readAccountName();
   var rows = readSubformRows();
   var products = collectProducts(rows);
   var rowIds = collectRowIds(rows);
@@ -178,7 +201,8 @@ try {
         // Diagnostics, echoed by the widget if it still cannot proceed.
         row_count: rows.length,
         row_keys: rowKeys,
-        urls_seen: urlsSeen.join(" | "),
+        urls_seen: urlsSeen || "not probed (a subform row supplied the parent id)",
+        account_name: accountName,
       },
       wait: true,
     },

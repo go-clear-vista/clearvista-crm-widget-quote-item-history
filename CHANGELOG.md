@@ -2,6 +2,21 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.5] - 2026-09-28
+
+### Fixed
+- **Books history now uses Analytics' synchronous export instead of bulk SQL
+  jobs.** Bulk jobs are queued: one sat at "not initiated" for minutes before
+  completing, longer than a widget call can wait, and where a job did finish the
+  CSV lines would not split ("Skipped a malformed sales order row"). Each
+  document type is now three small synchronous JSON reads - line items by SKU,
+  headers for just those documents, customer names - joined in the function,
+  and there is no CSV parsing at all. Verified against the workspace: a
+  known SKU returns in about a second.
+- The Client Script records what each URL probe returned (or "blocked") and the
+  banner shows it, and it also sends the form's `Account_Name`, which the widget
+  uses for the account default when the quote itself cannot be read.
+
 ## [1.8.4] - 2026-09-28
 
 ### Fixed
