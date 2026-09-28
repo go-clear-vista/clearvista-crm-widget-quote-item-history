@@ -33,7 +33,7 @@ All notable changes to this widget will be documented in this file.
   still live; Books rows are only as fresh as the Analytics sync.
 - `BOOKS_ORG_ID` and `MAX_DOCS_PER_TYPE` are replaced by `ANALYTICS_ORG_ID`,
   `ANALYTICS_WORKSPACE_ID` and `MAX_ANALYTICS_ROWS` (3000 per document type).
-- The function needs a second connection, **`zoho_analytics`**, carrying
+- The function needs a second connection, **`zohoanalytics`**, carrying
   `ZohoAnalytics.data.read`. The row shape returned to the widget is unchanged,
   so `index.html` needs no change.
 
