@@ -539,51 +539,42 @@ string automation.quote_item_history(String quote_id)
 							continue;
 						}
 
-						// 2. poll until the job completes (1004) or fails (1003 / 1005)
-						jobDone = false;
-						jobFailed = false;
+						// 2. fetch the result, retrying until it is ready. The job-status
+						// endpoint is not trusted: it can keep reporting 1001 "not
+						// initiated" while the data is already downloadable, so the
+						// download itself is the readiness test. Until the job is ready
+						// the endpoint answers with a JSON error object ("{..."), and once
+						// ready it answers with the CSV, which never starts with "{".
+						csvText = "";
+						csvReady = false;
+						lastReply = "";
 						for each pollAttempt in pollAttempts
 						{
-							if(jobDone || jobFailed)
+							if(csvReady)
 							{
 								continue;
 							}
-							statusResp = invokeurl
+							downloadResp = invokeurl
 							[
-								url :bulkBase + "/exportjobs/" + jobId
+								url :bulkBase + "/exportjobs/" + jobId + "/data"
 								type :GET
 								headers:analyticsHeaders
 								connection:"zohoanalytics"
 							];
-							statusData = statusResp.get("data");
-							jobCode = "";
-							if(statusData != null)
+							lastReply = ifnull(downloadResp,"").toString();
+							if(lastReply.trim().length() > 3 && !lastReply.trim().startsWith("{"))
 							{
-								jobCode = ifnull(statusData.get("jobCode"),"").toString();
-							}
-							if(jobCode == "1004")
-							{
-								jobDone = true;
-							}
-							else if(jobCode == "1003" || jobCode == "1005")
-							{
-								jobFailed = true;
+								csvText = lastReply;
+								csvReady = true;
 							}
 						}
-						if(!jobDone)
+						if(!csvReady)
 						{
-							warnings.add(docType + " history from Analytics did not finish in time or failed. Last status: " + statusResp.toString());
+							warnings.add(docType + " history from Analytics was not ready after " + pollAttempts.size() + " tries. Last reply: " + lastReply);
 							continue;
 						}
 
-						// 3. download and parse the CSV: header line, then one quoted line per row
-						csvText = invokeurl
-						[
-							url :bulkBase + "/exportjobs/" + jobId + "/data"
-							type :GET
-							headers:analyticsHeaders
-							connection:"zohoanalytics"
-						];
+						// 3. parse the CSV: header line, then one quoted line per row
 						// Strip the CSV's own quoting up front: the SQL already turned every
 						// double quote in the data into '' , so any " left is CSV wrapping.
 						// toList() can choke on quoted text, so split only after this.

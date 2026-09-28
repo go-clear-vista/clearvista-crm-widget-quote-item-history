@@ -2,6 +2,16 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.4] - 2026-09-28
+
+### Fixed
+- **Books rows never arrived: "Analytics did not finish in time".** The job
+  status endpoint kept answering 1001 "JOB NOT INITIATED" for all 30 polls, even
+  though the export itself is downloadable almost immediately. The function no
+  longer trusts the status endpoint: it tries the download up to 30 times and
+  treats a non-JSON reply as the finished CSV. A job that genuinely never
+  produces data still ends in a banner quoting the last reply.
+
 ## [1.8.3] - 2026-09-28
 
 ### Changed
