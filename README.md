@@ -23,8 +23,10 @@ Built to match the look and feel of the other ClearVista CRM widgets
   under the filters, rather than opening on an empty table
 - **Live table** - re-filters and re-sorts instantly as the filters change; no reload
 - **Sortable columns** - click any column header to sort; defaults to newest first
-- **Colour-coded pills** - document type and stage/status use the same colour map as
-  the other ClearVista widgets, extended with Books statuses
+- **Colour-coded pills** - the Doc Type pill is blue (quote), green (order) or
+  orange (invoice). The Stage / Status pill is filled with that same document colour,
+  and its dot shows the stage: grey draft/void, blue in progress, green done, yellow
+  waiting or part-paid, red overdue or lost
 - **Quote reference line** - states which sales quote number is being referenced
 - **Closing** - use the X in the popup header. There is deliberately no in-widget Close button: a popup opened by a Client Script ignores the SDK close call, so the button could not work.
 
@@ -321,6 +323,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.9.0
+- **Version**: 1.10.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books

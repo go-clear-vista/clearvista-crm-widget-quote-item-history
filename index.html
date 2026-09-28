@@ -27,10 +27,10 @@
 
       --doc-quote-bg:#dbeafe;
       --doc-quote-dot:#3b82f6;
-      --doc-order-bg:#e0e7ff;
-      --doc-order-dot:#6366f1;
-      --doc-invoice-bg:#dcfce7;
-      --doc-invoice-dot:#22c55e;
+      --doc-order-bg:#dcfce7;
+      --doc-order-dot:#16a34a;
+      --doc-invoice-bg:#ffedd5;
+      --doc-invoice-dot:#f97316;
     }
 
     *{box-sizing:border-box}
@@ -784,23 +784,33 @@ function setWarning(messages){
  * Colour maps (shared with the other ClearVista widgets)
  * ------------------------------------------------------------------ */
 
-var STATUS_COLORS = {
-  "draft":        { bg:"#dbeafe", dot:"#3b82f6" },
-  "negotiation":  { bg:"#dcfce7", dot:"#22c55e" },
-  "sent":         { bg:"#bfdbfe", dot:"#0ea5e9" },
-  "on hold":      { bg:"#fef3c7", dot:"#f59e0b" },
-  "quote ready":  { bg:"#dcfce7", dot:"#84cc16" },
-  "closed won":   { bg:"#bbf7d0", dot:"#16a34a" },
-  "closed lost":  { bg:"#fecaca", dot:"#ef4444" },
-  "open":         { bg:"#bfdbfe", dot:"#0ea5e9" },
-  "confirmed":    { bg:"#dcfce7", dot:"#84cc16" },
-  "closed":       { bg:"#bbf7d0", dot:"#16a34a" },
-  "paid":         { bg:"#bbf7d0", dot:"#16a34a" },
-  "partially_paid":{ bg:"#fef3c7", dot:"#f59e0b" },
-  "overdue":      { bg:"#fecaca", dot:"#ef4444" },
-  "unpaid":       { bg:"#fef3c7", dot:"#f59e0b" },
-  "void":         { bg:"#e2e8f0", dot:"#94a3b8" },
-  "voided":       { bg:"#e2e8f0", dot:"#94a3b8" }
+// The Stage / Status pill is filled with its document type's colour, so the
+// dot alone carries the stage: grey = not started or void, blue = in progress,
+// green = done, yellow = waiting or part-paid, red = overdue or lost. Any
+// status not listed gets a neutral grey dot.
+var STAGE_DOTS = {
+  "draft":            "#94a3b8",
+  "pending_approval": "#94a3b8",
+  "void":             "#94a3b8",
+  "voided":           "#94a3b8",
+  "open":             "#3b82f6",
+  "sent":             "#3b82f6",
+  "viewed":           "#3b82f6",
+  "negotiation":      "#3b82f6",
+  "quote ready":      "#3b82f6",
+  "confirmed":        "#3b82f6",
+  "delivered":        "#3b82f6",
+  "partially_invoiced":"#3b82f6",
+  "invoiced":         "#16a34a",
+  "paid":             "#16a34a",
+  "closed":           "#16a34a",
+  "closed won":       "#16a34a",
+  "fulfilled":        "#16a34a",
+  "on hold":          "#eab308",
+  "partially_paid":   "#eab308",
+  "unpaid":           "#eab308",
+  "overdue":          "#ef4444",
+  "closed lost":      "#ef4444"
 };
 
 var DOC_COLORS = {
@@ -1081,7 +1091,7 @@ function renderBody(rows){
       "<td>" + pill(row.doc_type || "—", docColors) + docNumber + "</td>" +
       '<td class="c-date">'  + formatDate(row.date) + "</td>" +
       '<td class="c-acct" title="' + esc(row.account_name || "") + '">' + (row.account_name ? esc(row.account_name) : "—") + "</td>" +
-      "<td>" + pill(status, STATUS_COLORS[statusKey] || null) + "</td>" +
+      "<td>" + pill(status, { bg: docColors ? docColors.bg : "#f1f5f9", dot: STAGE_DOTS[statusKey] || "#94a3b8" }) + "</td>" +
       '<td class="c-num">' + money(row.item_price) + "</td>" +
       '<td class="c-num">' + discountCell(row) + "</td>" +
       '<td class="c-num strong">' + money(unitAfter) + "</td>" +

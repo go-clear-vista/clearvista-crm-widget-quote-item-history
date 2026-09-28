@@ -2,6 +2,18 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.10.0] - 2026-09-28
+
+### Changed
+- **Doc Type colours.** Sales Quote is blue, Sales Order green and Sales Invoice
+  orange (order and invoice were too close before).
+- **Stage / Status pill.** The pill is filled with its document type's colour and
+  the dot alone carries the stage: grey for draft / void, blue for open, sent,
+  negotiation, confirmed and similar, green for invoiced, paid, closed and
+  closed won, yellow for on hold, unpaid and part-paid, red for overdue and
+  closed lost. Unlisted statuses get a neutral grey dot. Checked in headless
+  Chromium against 13 sample rows covering every document type and stage.
+
 ## [1.9.0] - 2026-09-28
 
 ### Changed
