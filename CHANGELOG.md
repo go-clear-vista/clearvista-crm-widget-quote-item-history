@@ -2,6 +2,21 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.0] - 2026-09-28
+
+### Changed
+- **Zoho Books history now comes from Zoho Analytics, not the Books API.** The
+  Books calls returned nothing, and they were also slow: one Items lookup, two
+  list calls and up to 60 detail calls per item. The function now runs two SQL
+  queries (sales orders, invoices) against the "Zoho Analytics All" workspace
+  through the Analytics v2 bulk-export API. CRM quote history is unchanged and
+  still live; Books rows are only as fresh as the Analytics sync.
+- `BOOKS_ORG_ID` and `MAX_DOCS_PER_TYPE` are replaced by `ANALYTICS_ORG_ID`,
+  `ANALYTICS_WORKSPACE_ID` and `MAX_ANALYTICS_ROWS` (3000 per document type).
+- The function needs a second connection, **`zoho_analytics`**, carrying
+  `ZohoAnalytics.data.read`. The row shape returned to the widget is unchanged,
+  so `index.html` needs no change.
+
 ## [1.7.0] - 2026-09-08
 
 ### Fixed

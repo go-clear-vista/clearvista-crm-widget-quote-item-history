@@ -167,9 +167,11 @@ The backend gathers data from two places:
 1. **CRM sales quotes** - a COQL query against the `Quoted_Items` subform module for
    every product on the current quote, then a second COQL query for the parent quote
    headers (number, account, stage, document date).
-2. **Zoho Books** - the Books `Items` endpoint resolves each CRM SKU to a Books
-   `item_id`, then the Sales Orders and Invoices list endpoints are filtered by that
-   `item_id` so only relevant documents are read in detail for line-level pricing.
+2. **Zoho Books, via Zoho Analytics** - two SQL queries against the "Zoho Analytics
+   All" workspace (which syncs from Books) join `Sales Order Items` / `Invoice Items`
+   to their header tables and `Customers`, filtered by the quote's SKUs. Each runs as
+   an Analytics bulk-export job (create, poll, download). No Books API calls are made,
+   so this is fast and uses no Books API quota; the trade-off is Analytics sync latency.
 
 Failures are non-fatal and surfaced in a "Heads up" banner: if the Books side is not
 configured yet, the CRM sales quote history still renders.
@@ -247,7 +249,8 @@ Then set the two configuration constants at the top of `quote_item_history`:
 | Setting | Where | Purpose |
 | --- | --- | --- |
 | Connection link name | the `connection:` line of all three `invokeurl` blocks | A CRM connection carrying **`ZohoCRM.coql.READ`** (Setup → Developer Hub → Connections). Must be a literal. |
-| `BOOKS_ORG_ID` | near the top of the function | Zoho Books organization ID. Set it to `""` to launch with CRM quotes only; the widget will say so in its banner. |
+| Analytics connection link name | the `connection:` line of the three Analytics `invokeurl` blocks | A connection carrying **`ZohoAnalytics.data.read`**, named `zoho_analytics`. Must be a literal. |
+| `ANALYTICS_ORG_ID`, `ANALYTICS_WORKSPACE_ID` | near the top of the function | The Analytics org and the workspace that syncs Books. Set either to `""` to launch with CRM quotes only; the widget will say so in its banner. |
 
 ### 3. Create the button
 
@@ -264,7 +267,7 @@ Then set the two configuration constants at the top of `quote_item_history`:
 - Read: `Quotes` and the `Quoted_Items` subform module
 - Read: `Products` (via the quote's product lookups)
 - COQL read access via the configured CRM connection
-- Zoho Books read access to Items, Sales Orders and Invoices
+- Zoho Analytics read access (`ZohoAnalytics.data.read`) to the Books sync workspace: Sales Orders, Sales Order Items, Invoices, Invoice Items, Customers
 
 The widget performs **no writes** - it is read-only.
 
@@ -297,7 +300,9 @@ in its banner. Useful for reviewing layout and filter behaviour without a CRM re
 | "'connections' value ... does not match ... 'CONNECTION LINKNAME'" | `connection:` was given a variable; it must be a quoted literal - fixed in 1.0.5 |
 | "returned output that is not valid JSON" | A free-text value reached the response without passing through `quote_item_history_clean`; check the function log |
 | Banner: "Sales quote history could not be loaded" | The connection named in the `invokeurl` blocks is missing, misnamed, or lacks the `ZohoCRM.coql.READ` scope |
-| Banner: "Zoho Books sales orders and invoices are not included" | `BOOKS_ORG_ID` is empty in the function |
+| Banner: "Zoho Books sales orders and invoices are not included" | `ANALYTICS_ORG_ID` or `ANALYTICS_WORKSPACE_ID` is empty in the function |
+| Banner: "... could not be requested from Analytics" | The `zoho_analytics` connection is missing or lacks `ZohoAnalytics.data.read`; the banner quotes Analytics' reply |
+| Table lacks recent orders/invoices | Analytics sync latency - Books documents appear after the next sync |
 | Table shows quotes but no orders/invoices | The CRM SKU has no matching Books item, or the Books item has no documents in the selected timeframe |
 | "No item history found" | None of this quote's products appear on any other document yet |
 | Banner: "No line items with a linked product were found" | Usually the connection is missing `ZohoCRM.coql.READ` - the banner beside it quotes CRM's reply, look for `OAUTH_SCOPE_MISMATCH` |
@@ -316,6 +321,6 @@ Internal use only - ClearVista employees.
 
 ## Version
 
-- **Version**: 1.7.0
+- **Version**: 1.8.0
 - **Last Updated**: September 2026
 - **Compatibility**: Zoho CRM (All Plans) + Zoho Books
