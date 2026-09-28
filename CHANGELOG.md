@@ -2,6 +2,18 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.9] - 2026-09-28
+
+### Changed
+- **Close button.** The SDK close resolves `true` yet a Client Script popup
+  stays open (reported: `postMessage: sent; window.close: sent; SDK close:
+  resolved true`), so it is ignored there. The first click still tries the safe
+  routes; if the popup remains, the message offers a **second click**, which
+  uses `Popup.closeReload()` - that closes the popup but reloads the quote page,
+  so it is never done without being asked twice. The X in the header closes
+  without reloading. Whether `closeReload` closes a Client Script popup is
+  untested.
+
 ## [1.8.8] - 2026-09-28
 
 ### Fixed

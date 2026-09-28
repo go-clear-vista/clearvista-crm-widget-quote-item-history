@@ -1322,7 +1322,19 @@ function resizePopup(){
   }
 }
 
+var closeTriedOnce = false;
+
 el("closeBtn").addEventListener("click", function(){
+  // Second click: the safe routes did not close this popup (a Client Script
+  // popup ignores the plain SDK close). closeReload does close it, but also
+  // reloads the quote form underneath, so it is only used when asked for twice.
+  if(closeTriedOnce){
+    try { ZOHO.CRM.UI.Popup.closeReload(); }
+    catch(error){ setStatus("Could not close the popup - use the X at the top right of this window.", "error"); }
+    return;
+  }
+  closeTriedOnce = true;
+
   // Popups opened by a Client Script (ZDK.Client.openPopup) can ignore the
   // SDK close on some builds, so try each route and, if the popup is still
   // here afterwards, say where the working close control is. closeReload is
@@ -1354,7 +1366,7 @@ el("closeBtn").addEventListener("click", function(){
     }
   });
   setTimeout(function(){
-    setStatus("The popup did not close from here - use the X at the top right of this window. (Tried - " + outcomes.join("; ") + ")", "error");
+    setStatus("This popup ignored the normal close. Click Close again to close it by reloading the quote page (any unsaved changes on the quote form would be lost), or use the X at the top right of this window to close without reloading. (Tried - " + outcomes.join("; ") + ")", "error");
   }, 700);
 });
 
