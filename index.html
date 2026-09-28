@@ -1477,8 +1477,11 @@ async function onPageLoad(data){
   setStatus("Loading item history...", "loading");
 
   try {
+    var number = findQuoteNumber(data, 0);
+    // Show the number the form supplied straight away; a later record or
+    // backend read replaces it with the authoritative CRM_Quote_Number.
+    if(number) setReference(number);
     if(!recordId){
-      var number = findQuoteNumber(data, 0);
       if(number){
         setStatus("Looking up quote " + number + "...", "loading");
         recordId = await recordIdFromQuoteNumber(number);
@@ -1507,7 +1510,7 @@ async function onPageLoad(data){
       var response = await ZOHO.CRM.API.getRecord({ Entity: MODULE_API_NAME, RecordID: recordId });
       var record   = response && response.data && response.data[0] ? response.data[0] : null;
       if(record){
-        setReference(record.CRM_Quote_Number || record.Quote_Number || record.Quote_No || record.Subject || recordId);
+        if(record.CRM_Quote_Number) setReference(record.CRM_Quote_Number);
       }
     }
 

@@ -2,6 +2,41 @@
 
 All notable changes to this widget will be documented in this file.
 
+## [1.8.1] - 2026-09-28
+
+### Fixed
+- **Books lookups missed products whose CRM name is not their SKU.** Analytics
+  matches on the Books SKU, which is the CRM `Product_Code`; the function was
+  using `Product_Name` (e.g. "4-Series(R) Media Presentation Controller 102" is
+  `MPC4-102-B`). Codes are now read from Products, and Books rows are labelled
+  with the CRM product name so the Item Name filter still matches them.
+- The Client Script also reads the quote's record id from the CRM page URL
+  (`.../tab/Quotes/<id>/edit`) when no subform row exposes a parent id. With the
+  id the backend reads the quote itself, which supplies `CRM_Quote_Number` and
+  the account for the default Account filter. A new, unsaved quote has no id in
+  its URL and still shows "-".
+- The Analytics export request now passes `CONFIG` as a parameter instead of a
+  hand-built URL.
+- **Footer quote number.** The Client Script now reads `CRM_Quote_Number` from
+  the form (`ZDK.Page.getField`) and sends it as `quote_number`; the widget
+  shows it immediately. The `Quote_Number` field (a long id-like value) is no
+  longer used as a fallback, so the footer only ever shows the `SQ-xxxxxx` form.
+
+## [1.8.0] - 2026-09-28
+
+### Changed
+- **Zoho Books history now comes from Zoho Analytics, not the Books API.** The
+  Books calls returned nothing, and they were also slow: one Items lookup, two
+  list calls and up to 60 detail calls per item. The function now runs two SQL
+  queries (sales orders, invoices) against the "Zoho Analytics All" workspace
+  through the Analytics v2 bulk-export API. CRM quote history is unchanged and
+  still live; Books rows are only as fresh as the Analytics sync.
+- `BOOKS_ORG_ID` and `MAX_DOCS_PER_TYPE` are replaced by `ANALYTICS_ORG_ID`,
+  `ANALYTICS_WORKSPACE_ID` and `MAX_ANALYTICS_ROWS` (3000 per document type).
+- The function needs a second connection, **`zoho_analytics`**, carrying
+  `ZohoAnalytics.data.read`. The row shape returned to the widget is unchanged,
+  so `index.html` needs no change.
+
 ## [1.7.0] - 2026-09-08
 
 ### Fixed

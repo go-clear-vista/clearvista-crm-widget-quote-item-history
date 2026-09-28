@@ -104,11 +104,51 @@ function collectProducts(rows) {
   return products;
 }
 
+// The quote's own number ("SQ-101074"), read live from the form. getRecord()
+// returns nothing on this layout, but a single field is often still readable.
+function readQuoteNumber() {
+  var names = ["CRM_Quote_Number", "Quote_Number"];
+  for (var i = 0; i < names.length; i++) {
+    try {
+      var field = ZDK.Page.getField(names[i]);
+      var value = field && field.getValue ? field.getValue() : "";
+      if (value && /^SQ-/i.test(String(value).trim())) {
+        console.log("CS: quote number from " + names[i] + ": " + value);
+        return String(value).trim();
+      }
+    } catch (err) {
+      console.log("CS: getField('" + names[i] + "') threw " + err);
+    }
+  }
+  return "";
+}
+
+// The quote's record id from the CRM page URL, which is the one thing the
+// layout always exposes: .../tab/Quotes/<id>/edit?layoutId=... An unsaved
+// new quote or clone has no id in its URL, and correctly yields "".
+function readQuoteIdFromUrl() {
+  var candidates = [];
+  try { candidates.push(window.location.href); } catch (err) {}
+  try { candidates.push(window.top.location.href); } catch (err) {}
+  try { candidates.push(document.location.href); } catch (err) {}
+  try { candidates.push(document.referrer); } catch (err) {}
+  for (var i = 0; i < candidates.length; i++) {
+    var match = /\/tab\/Quotes\/(\d{8,})/.exec(String(candidates[i] || ""));
+    if (match) {
+      console.log("CS: quote id from URL: " + match[1]);
+      return match[1];
+    }
+  }
+  console.log("CS: no quote id in the page URL (" + candidates.join(" | ") + ")");
+  return "";
+}
+
 try {
+  var quoteNumber = readQuoteNumber();
   var rows = readSubformRows();
   var products = collectProducts(rows);
   var rowIds = collectRowIds(rows);
-  var quoteId = findParentId(rows);
+  var quoteId = findParentId(rows) || readQuoteIdFromUrl();
   var rowKeys = rows.length > 0 ? Object.keys(rows[0]).join(",") : "";
 
   console.log("CS: quote id '" + quoteId + "', row ids " + rowIds.length + ", products " + products.length);
@@ -129,6 +169,7 @@ try {
       data: {
         action: "item_history",
         quote_id: quoteId,
+        quote_number: quoteNumber,
         row_ids: rowIds.join(","),
         products: products,
         // Diagnostics, echoed by the widget if it still cannot proceed.
