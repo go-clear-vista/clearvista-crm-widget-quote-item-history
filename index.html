@@ -1210,11 +1210,10 @@ function normalizeRows(rows){
 function applyPayload(payload){
   allRows = normalizeRows(payload.rows);
 
-  var itemNames = payload.items && payload.items.length
-    ? payload.items.slice()
-    : (suppliedProductNames.length
-        ? suppliedProductNames.slice()
-        : allRows.map(function(row){ return row.item_name; }));
+  // The form's own products are listed even when they have no history yet,
+  // so an item just added to the quote still appears in the checklist.
+  var itemNames = (payload.items || []).concat(suppliedProductNames);
+  if(!itemNames.length) itemNames = allRows.map(function(row){ return row.item_name; });
 
   var unique = [];
   var seen   = {};
@@ -1644,14 +1643,19 @@ async function onPageLoad(data){
       }
     }
 
-    // One argument carries both forms: a record id, or "products=<id,id,...>".
+    // One argument carries every form, joined by ";": a record id or
+    // "rows=<id,id,...>" to identify the quote, plus "products=<id,id,...>".
     // Zoho cannot register a second argument on an existing function - it will
     // not persist until the code compiles, and the code cannot compile until
     // it is registered - so the identifier is encoded instead.
-    var identifier;
-    if(recordId)            identifier = String(recordId);
-    else if(rowIds.length)  identifier = "rows=" + rowIds.join(",");
-    else                    identifier = "products=" + productIds.join(",");
+    // The products always travel when the form supplied them: they are read
+    // live from the subform, so they include rows added since the last save,
+    // which the saved quote the record id points at does not have yet.
+    var parts = [];
+    if(recordId)           parts.push(String(recordId));
+    else if(rowIds.length) parts.push("rows=" + rowIds.join(","));
+    if(productIds.length)  parts.push("products=" + productIds.join(","));
+    var identifier = parts.join(";");
 
     var payload = await executeFunction(FUNCTION_NAME, { quote_id: identifier });
 
